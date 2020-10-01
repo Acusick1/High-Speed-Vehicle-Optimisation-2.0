@@ -1,0 +1,14 @@
+# Results Folder: Want to ensure all file types
+# are ignored
+
+# Things appearing in repo to ignore:
+*.mat
+*.asv
+*.fig
+*.png
+*.jpeg
+*.emp
+*.stl
+**/Results/
+**/External/
+**/Offpath/
