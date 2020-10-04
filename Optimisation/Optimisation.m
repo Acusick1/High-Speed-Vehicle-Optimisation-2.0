@@ -21,7 +21,7 @@ classdef Optimisation
     
     properties (Dependent)
         
-        saveIt
+        save_it
     end
     
     methods
@@ -52,11 +52,11 @@ classdef Optimisation
             ubound = repmat(obj.ub, dim, 1);
             a = unifrnd(lbound, ubound, [dim, obj.nVar]);
         end
-        function a = get.saveIt(obj)
+        function a = get.save_it(obj)
             
             a = 0:ceil(obj.maxIt/10):obj.maxIt;
         end
-        function save_obj(obj, it)
+        function save_opt(obj, it)
             
             save(fullfile(obj.save_dir, sprintf('it%i', it-1)));
         end

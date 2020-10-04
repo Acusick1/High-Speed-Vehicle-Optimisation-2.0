@@ -1,16 +1,16 @@
-classdef design
+classdef Design
     
     properties
         
-        Variables
-        Cost
-        Penalty
-        Penalties
+        variables
+        cost
+        penalty
+        penalties
     end
     methods
         function obj = design(varargin)
             %% Individual design class
-            % Input is in-order class properties (Variables, Cost, etc)
+            % Input is in-order class properties (variables, cost, etc)
             
             if nargin >= 1
                 

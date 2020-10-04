@@ -4,9 +4,9 @@ function [foils, test_var, test_pen] = geo_doe(g_fun, opt_var)
 nOpt = opt_var.nOpt;
 
 % Number of designs to test for geometric violation design of experiment
-nDes = 10 * nOpt;
+nDes = 1000 * nOpt;
 % Number of designs to use for performance design of experiment 
-nTest = 1 * nOpt;
+nTest = 5 * nOpt;
 
 % Geometric DOE positions
 [~, var] = opt_var.init_lhs(nDes);
@@ -18,7 +18,7 @@ for i = nDes:-1:1
     foils(i,:) = BezierFoil.define;
 end
 
-parts = builder(var, opt_var.nVar, opt_var.name, foils);
+parts = builder(var, opt_var.nVar, opt_var.var_names, foils);
 % Calculate geometric violations (no performance analysis)
 for i = nDes:-1:1
     

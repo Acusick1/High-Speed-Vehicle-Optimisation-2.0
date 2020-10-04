@@ -1,4 +1,4 @@
-classdef PSO < Globaloptimisation
+classdef PSO < GlobalOptimisation
     
     properties
         
@@ -27,7 +27,7 @@ classdef PSO < Globaloptimisation
             obj.lb = lb(:)';
             obj.ub = ub(:)';
             obj.nVar = numel(lb);
-            obj.Pm = 1/obj.nVar;
+            obj.mut_prob = 1/obj.nVar;
             obj.nPop = nPop;
             obj.cost_fun = cost_fun;
             
@@ -49,7 +49,7 @@ classdef PSO < Globaloptimisation
         end
         function obj = update_cost(obj)
             
-            [obj.cost, obj.penalty] = feval(obj.cost_fun, obj.variables);
+            [obj.cost, obj.penalty, obj.penalties] = obj.cost_fun(obj.variables);
         end
         function obj = init_best(obj)
             
@@ -104,7 +104,7 @@ classdef PSO < Globaloptimisation
             
             if nargin < 2 || isempty(con_tol), con_tol = inf; end
             
-            id = population.dominance(obj.cost, obj.best.cost, obj.penalty, obj.best.penalty, con_tol);
+            id = Population.dominance(obj.cost, obj.best.cost, obj.penalty, obj.best.penalty, con_tol);
             con = id == 1;
             
             %% TODO: Replace with one-liner structfun()
@@ -116,20 +116,14 @@ classdef PSO < Globaloptimisation
         end
         function obj = update_gBest(obj, e)
             
-            if nargin < 2 || isempty(e), e = 0; end
+            if nargin < 2 || isempty(e), e = 0; end            
             
-            if obj.nFun == 1
+            best_id = obj.tournament(obj.best.cost, obj.best.penalty, e);
+            
+            fn = fieldnames(obj.best);
+            for i = 1:length(fn)
                 
-                best_id = obj.tournament(obj.best.cost, obj.best.penalty, e);
-                
-                fn = fieldnames(obj.best);
-                for i = 1:length(fn)
-                    
-                    a.(fn{i}) = obj.best.(fn{i})(best_id,:);
-                end
-            else
-                %% TODO
-                % best_id = PSO.roulette(obj.best.cost, true);
+                a.(fn{i}) = obj.best.(fn{i})(best_id,:);
             end
             
             if isempty(obj.gBest) || a.cost < obj.gBest.cost
@@ -195,7 +189,7 @@ classdef PSO < Globaloptimisation
                 
                 obj.hist(i,:) = obj.gBest;
                 
-                if any(i-1 == obj.saveIt), obj.saveOpt(i); end
+                if any(i-1 == obj.save_it), obj.save_opt(i); end
                 
                 if isequaln(obj.hist(i), obj.hist(i-1))
                     
@@ -258,7 +252,7 @@ classdef PSO < Globaloptimisation
                 
                 obj.hist(i,:) = obj.gBest;
                 
-                if any(i-1 == obj.saveIt), obj.saveOpt(i); end
+                if any(i-1 == obj.save_it), obj.save_opt(i); end
                 
                 if isequaln(obj.hist(i), obj.hist(i-1))
                     

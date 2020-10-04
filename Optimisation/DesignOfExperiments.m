@@ -7,7 +7,6 @@ classdef DesignOfExperiments
         options
         var_min
         var_max
-        nDes
         nVar
         nTest
         positions
@@ -17,8 +16,13 @@ classdef DesignOfExperiments
         models
     end
     
+    properties (Constant)
+        
+        nDes = 10 * DesignOfExperiments.nVar
+    end
+    
     methods
-        function obj = DesignOfExperiments(var_min, var_max, nDes, fun, options, pos)
+        function obj = DesignOfExperiments(var_min, var_max, fun, pos)
             
             nVar = length(var_min);
             
@@ -31,29 +35,22 @@ classdef DesignOfExperiments
                     (var_max - var_min)';
             end
             
-            obj.designs = design();
-            
             obj.nVar = nVar;
             obj.var_min = var_min;
             obj.var_max = var_max;
-            obj.nDes = nDes;
             obj.fun = fun;
-            obj.options = options;
         end
-        function obj = analyse(obj, fidelity)
+        function obj = analyse(obj)
             
-            for i = 1:length(fidelity)
+            for i = 1:length(obj.fun)
                 
-                obj.options.Fidelity = fidelity(i);
-                [cost, pen, all_pen] = obj.fun(obj.positions, obj.options);
-                
-                obj.designs(:, i) = design(obj.positions, cost, pen, all_pen);
+                [cost, pen, all_pen] = feval(obj.fun(i), obj.positions);
             end
         end
         function [obj] = penalty_reduction(obj, keep)
             
             id = (1:obj.nDes)';
-            pen = max(0, obj.designs.Penalties);
+            pen = max(0, obj.designs.penalty);
             mean_pen = mean(pen, 2);
             
             % Sorting for min penalty
@@ -76,8 +73,8 @@ classdef DesignOfExperiments
             
             for i = nFid:-1:1
                 
-                cost{i} = obj.designs(:, i).Cost;
-                pen{i} = max(0, obj.designs(:, i).Penalties);
+                cost{i} = obj.designs(:, i).cost;
+                pen{i} = max(0, obj.designs(:, i).penalty);
                 
                 if nargin >= 2
                     
@@ -111,11 +108,11 @@ classdef DesignOfExperiments
                         'expected-improvement-plus',...
                         'UseParallel',1,'Verbose',1));
                 
-                predCost = resubPredict(model{i});
+                pred_cost = resubPredict(model{i});
                 figure();
                 hold on
                 plot(data(:, i),'r.');
-                plot(predCost,'b');
+                plot(pred_cost,'b');
                 xlabel('x');
                 ylabel('y');
                 legend({'data','predictions'}, 'Location','Best');

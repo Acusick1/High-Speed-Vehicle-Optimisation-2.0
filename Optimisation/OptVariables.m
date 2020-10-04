@@ -8,7 +8,7 @@ classdef OptVariables < Combinable
         var
         var_min
         var_max
-        name
+        var_names
         condition
         transform
         optimise
@@ -38,7 +38,7 @@ classdef OptVariables < Combinable
                 obj.var_min = reshape(var_min(~constant), 1, []);
                 obj.var_max = reshape(var_max(~constant), 1, []);
                 
-                if nargin >= 3, obj.name = varargin{3}(:)'; end
+                if nargin >= 3, obj.var_names = varargin{3}(:)'; end
                 
                 if nargin >= 4 && isstring(varargin{4})
                     
@@ -63,6 +63,50 @@ classdef OptVariables < Combinable
                 
                 obj.optimise(constant) = false;
                 obj.nOpt = sum(obj.optimise);
+            end
+        end
+        function new = builder(obj, var, varargin)
+            
+            [nPop, ~] = size(var);
+            
+            parts = varargin;
+            
+            %% TODO: Needs updated for multiple parts
+            % Have nVar as vector?
+            pos_ind = 1:sum(obj.nVar);
+            cumnum = cumsum(obj.nVar);
+            
+            next = 1;
+            part = 0;
+            while true
+                
+                if part == 0 || next > cumnum(part)
+                    
+                    part = part + 1;
+                end
+                
+                current = obj.var_names(next);
+                con = current == obj.var_names;
+                
+                vari = mat2cell(var(:,con), ones(nPop, 1), sum(con));
+                
+                % Hack to ensure single variable set calls can be run
+                try
+                    [parts{part}.(current)] = vari{:};
+                catch
+                    parts{part} = parts{part}(1);
+                    parts{part}(1).(current) = vari{:};
+                end
+                
+                next = find(~con & pos_ind > next, 1);
+                if isempty(next), break; end
+            end
+            
+            %% Change to fully cell based
+            % Cannot do earlier due to struct access above
+            for i = numel(parts):-1:1
+                
+                new(:,i) = mat2cell(parts{i}, ones(nPop, 1));
             end
         end
         function obj = lincon(obj)
@@ -123,7 +167,7 @@ classdef OptVariables < Combinable
             for i = 1:length(splitstring)
                 
                 check = str2double(splitstring(i));
-                col = array(splitstring(i) == obj.name);
+                col = array(splitstring(i) == obj.var_names);
                 
                 if ~isnan(check)
                     

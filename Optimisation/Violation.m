@@ -164,14 +164,20 @@ classdef Violation < handle
             
             pen = max(0, pen);
         end
-        function pen = get_penalty(penalties)
+        function pen = get_penalty(penalties, dim)
             
-            active = penalties(penalties > 0);
-            
-            % Quad loss
-            % a = eta * sum(active(:).^2);
-            % SCV
-            pen = sum(active(:));
+            if isvector(penalties)
+                
+                active = penalties(penalties > 0);
+                % Quad loss
+                % a = eta * sum(active(:).^2);
+                % SCV
+                pen = sum(active(:));
+            else
+                if nargin < 2 || isempty(dim), dim = 1; end
+                active = max(penalties, 0);
+                pen = sum(active, dim);
+            end
         end
         function obj = test()
             

@@ -170,7 +170,7 @@ classdef Aerofoil < handle
             [a(1), ~, a(2)] = obj.check_curve("upper");
             [a(3), ~, a(4)] = obj.check_curve("lower");
             [a(5), a(6), a(7), a(8)] = obj.check_curve("thickness");
-            [a(9)] = obj.check_thickness();
+            [obj, a(9)] = obj.check_thickness();
             LE = obj.lead_edge;
             a([10 11]) = LE.radius;
             obj.checks = a;
@@ -231,36 +231,26 @@ classdef Aerofoil < handle
             
             if which == "lower", d_f = -d_f; d_r = -d_r; end
         end
-        function out = check_thickness(obj)
+        function [obj, out] = check_thickness(obj)
             
             c = obj.camber;
             t = obj.thickness;
             
             % Alter aerofoil if any thickness is < 0 or less than minimum thickness
             % outside of leading and trailing edges
-            inner = c(:,1) > obj.edge & c(:,1) < 1 - obj.edge;
-            tNeg = t < 0;% & ~inner;
-            
-            zu_int = interp1(c(:,1), c(:,2), obj.xu);
-            zl_int = interp1(c(:,1), c(:,2), obj.xl);
-            
-            % Reset any edge negatives to camber line
-%             obj.xu(tNeg) = c(tNeg, 1);
-%             obj.xl(tNeg) = c(tNeg, 1);
-            obj.zu(tNeg) = zu_int(tNeg);
-            obj.zl(tNeg) = zl_int(tNeg);
-            
-            % Reset any inner values lower than threshold
-%             tFix = t < obj.tMin & inner;
+            inner = c(:,1) > 0 & c(:,1) < 1;
+            tFix = (t < obj.tMin & inner) | t < 0;
+
+            obj = obj.fix_thickness(tFix);
           
             % If any negative values exist, provide minimum for penalty function
             % If no negative value exists, smallest thickness value outside of edges
             % will be returned. In this case, no penalty will be applied, but it
             % provides some continuity in the constraint function as opposed to always
             % returning a min value of zero (ie. at LE)
-            if any(tNeg)
+            if any(tFix)
                 
-                out = sum(t(tNeg));
+                out = sum(t(tFix));
             else
                 out = min(t);
             end

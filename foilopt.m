@@ -63,34 +63,47 @@ force_coeffs = [base_aero.force_coeffs];
 p_v_fun = @(fc) [fc.Cl];
 p_v = Violation(p_v_fun(force_coeffs), nan, p_v_fun, 1, "Cl");
 
-getCost = @(fc) max([fc.Cd]);
+get_cost = @(fc) max([fc.Cd]);
 
-cost_fun = @(opt_var)run(opt_var, var, pos, build_fun, aero, states, f_v, p_v, getCost);
+var = OptVariables([a.min], [a.max], var_names);
 
-var_min = [a.min];
-var_max = [a.max];
+var_min = var.var_min;
+var_max = var.var_max;
 
-var = OptVariables(var_min, var_max, var_names);
+cost_fun = @(opt_var) lf_run(opt_var, var, foils, aero, states, f_v, p_v, get_cost);
+hf_cost_fun = @(opt_var) hfrun(opt_var, var, doe_foils, states, p_v, get_cost);
 
 [doe_foils, doe_var, doe_pen] = geo_doe(f_v, var);
 Aerofoil.plotter(doe_foils);
 save_figs(save_dir);
-[lf_cost, ~, lf_pen] = run(doe_var, [], [], doe_foils, aero, states, f_v, p_v, getCost);
+[lf_cost, ~, lf_pen] = lf_run(doe_var, var, doe_foils, aero, states, f_v, p_v, get_cost);
+[hf_cost, hf_pen, hf_results] = hfrun(doe_var, var, doe_foils, states, p_v, get_cost);
 
-[hf_cost, hf_pen, hf_results] = hfrun(doe_foils, states, p_v, getCost);
+del = any(isinf(hf_cost), 2);
+
+doe_var(del,:) = [];
+lf_cost(del,:) = [];
+lf_pen(del,:) = [];
+hf_cost(del,:) = [];
+hf_pen(del,:) = [];
+
 
 % Difference in cost and performance penalties between fidelities
 % lf has to be reduced to ensure only performance penalties are compared
-data = [hf_cost - lf_cost, hf_pen - lf_pen(:, size(hf_pen, 2)+1:end)];
+data = [hf_cost - lf_cost, hf_pen - lf_pen(:, end-size(hf_pen, 2)+1:end)];
+% data = [lf_cost, lf_pen(:, end-2:end)];
 
-pso = PSO(var_min, var_max, nPop, cost_fun, [], nfun, maxIt);
+pso = MFPSO(hf_cost_fun, var_min, var_max, nPop, cost_fun, [], nfun, maxIt);
+pso.hf_completed = doe_var(:, var.opt_var);
+pso.data = data;
+pso = pso.update_models();
 save(fullfile(save_dir, 'preopt'))
 
 pso = pso.main();
 
 save(fullfile(save_dir, 'final'))
 
-function [cost, vio, all_vio] = run(opt_var, var, pos, build_fun, aero, states, f_v, p_v, get_cost)
+function [cost, vio, all_vio] = lf_run(opt_var, var_obj, foils, aero, states, f_v, p_v, get_cost)
 %% Cost function
 %% TODO: split into cost a violation functions
 %% TODO: don't even bring foils in and rely on handle?
@@ -98,22 +111,16 @@ function [cost, vio, all_vio] = run(opt_var, var, pos, build_fun, aero, states, 
 
 %% Apply variables to objects
 
-[nPop, ~] = size(opt_var);
+[nPop, nOpt] = size(opt_var);
 
-if isempty(var)
-
+if nOpt == sum(var_obj.nVar)
+    
     var = opt_var;
 else
-    var = repmat(var, nPop, 1);
-    var(:, pos) = opt_var;
+    var = repmat(var_obj.var, nPop, 1);
+    var(:, var_obj.opt_var) = opt_var;
 end
-
-% Nonsense to allow parts to be passed directly
-try 
-    parts = build_fun(var);
-catch
-    parts = mat2cell(build_fun, ones(nPop, 1));
-end
+parts = var_obj.builder(var, foils);
 
 %% Analysis
 
@@ -159,7 +166,21 @@ vio(~feasible, :) = inf;
 
 end
 
-function [cost, vio, results] = hfrun(foils, states, p_v, get_cost)
+function [cost, vio, results] = hfrun(opt_var, var_obj, foils, states, p_v, get_cost)
+%% High fidelity cost function
+
+%% Apply variables to objects
+
+[nPop, nOpt] = size(opt_var);
+
+if nOpt == sum(var_obj.nVar)
+    
+    var = opt_var;
+else
+    var = repmat(var_obj.var, nPop, 1);
+    var(:, var_obj.opt_var) = opt_var;
+end
+foils = var_obj.builder(var, foils);
 
 aero = SU2();
 gmsh = Gmsh();
@@ -168,13 +189,22 @@ vals = SU2.convert_states(states);
 
 for i = numel(foils):-1:1
     
-    gmsh.generate(foils(i).coords);
+    gmsh.generate(foils{i}.coords);
     copyfile(gmsh.out_path, aero.path);
     results(i,:) = aero.run(vals);
-    cost(i,:) = get_cost(results(i,:));
     
-    p_v.value = p_v.fun(results(i,:));
-    vio(i,:) = p_v.penalties;
+    %% TODO: Won't work for multiple flightstates
+    if any(results.Res_Flow > 0)
+        
+        cost(i,:) = inf;
+        vio(i,:) = inf;
+    else
+        
+        cost(i,:) = get_cost(results(i,:));
+
+        p_v.value = p_v.fun(results(i,:));
+        vio(i,:) = p_v.penalties;
+    end
 end
 
 end
