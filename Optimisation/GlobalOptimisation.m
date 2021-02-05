@@ -4,6 +4,7 @@ classdef GlobalOptimisation < Optimisation
         
         nPop
         stall = 0
+        maxStall = inf
         mut_prob
         con_tol
     end
@@ -81,11 +82,23 @@ classdef GlobalOptimisation < Optimisation
             lbMat = repmat(obj.lb, rows, 1);
             ubMat = repmat(obj.ub, rows, 1);
         end
+        function obj = set.con_tol(obj, val)
+            
+            if numel(val) == 1
+                
+                val = repmat(val, obj.maxIt + 1, 1);
+            end
+            
+            obj.con_tol = val;
+        end
         function obj = constraint_tolerance(obj, tf, ef)
             % Constrained optimization by ε constrained particle swarm optimizer with ε-level control
             
+            if ~isempty(obj.con_tol), return; end
+                
             t = obj.maxIt + 1;
             cons = obj.penalty;
+            nCon = size(cons, 2);
             
             if nargin < 2 || isempty(tf), tf = ceil(obj.maxIt/2); end
             if nargin < 3 || isempty(ef), ef = 0; end
@@ -96,22 +109,29 @@ classdef GlobalOptimisation < Optimisation
             % Needs non-zero value to tend towards
             if ef, tEnd = ef; else, tEnd = 1e-16; end
             
-            for i = 0:tf
+            for j = nCon:-1:1
                 
-                if i == 0
+                numeric = isfinite(cons(:,j));
+                conj = cons(numeric, j);
+                e(1, j) = 0.5*(mean(conj) + min(conj));
+            end
+            
+            for i = 1:tf
                     
-                    ei = 0.5*(mean(cons) + min(cons));
+                if i < tf
                     
-                elseif i < tf
+                    % Linear
+                    % ei = e(1) + i * (ef - e(1))/tf;
                     
-                    B = log(e(1)/tEnd)/tf;
-                    ei = e(1) * exp(-B * i);
+                    % Both from: Constrained Optimization by ε Constrained Differential Evolution with Dynamic ε-Level Control
+                    B = log(e(1,:)/tEnd)/tf;
+                    ei = e(1,:) .* exp(-B * i);
                     
                     % B = atanh(1 - ef/e0)/tf;
-                    % e = e0 * (1 - tanh(B * t));
+                    % ei = e0 * (1 - tanh(B * t));
                 end
                 
-                e(i + 1) = ei;
+                e(i + 1,:) = ei;
             end
             
             obj.con_tol = e;
@@ -121,7 +141,7 @@ classdef GlobalOptimisation < Optimisation
     methods (Static)
         function id = tournament(fitness, violation, e)
             %% Tournament for selecting best
-            % Currently, matrices will be compared row by row to give 
+            % Currently, matrices will be compared row by row to give
             % numel(id) = nRows
             % If vectors, assumed single best is to be found
             

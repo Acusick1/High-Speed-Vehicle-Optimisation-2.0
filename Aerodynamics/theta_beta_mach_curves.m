@@ -1,16 +1,9 @@
-function [theta_beta_mach, max_theta_beta_mach] = theta_beta_mach_curves(mach, beta)
+function [theta_beta_mach, max_theta_beta_mach] = theta_beta_mach_curves(mach, beta, g)
 
-if nargin < 1
-    
-    mach = 1:0.01:20;
-end
+if nargin < 1, mach = 1:0.01:20; end
+if nargin < 2, beta = (0:0.0001:pi/2)'; end
+if nargin < 3, g = 1.4; end
 
-if nargin < 2
-    
-    beta = (0:0.0001:pi/2)';
-end
-
-g = 1.4;
 theta = atan(2 * cot(beta) .* ((mach.^2 .* (sin(beta).^2)-1) ./ ...
     (mach.^2 .* (g + cos(2 * beta)) + 2)));
 

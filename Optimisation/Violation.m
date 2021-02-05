@@ -1,6 +1,6 @@
-classdef Violation < handle
+classdef Violation < Combinable% < handle
     
-    properties (SetObservable)
+    properties %(SetObservable)
        
         value
     end
@@ -11,9 +11,9 @@ classdef Violation < handle
         val_max
         scale
         description
-        fun
         penalty
         penalties
+        fun_handle
     end
 
     properties (Dependent)
@@ -22,7 +22,7 @@ classdef Violation < handle
     end
     
     methods
-        function obj = Violation(val_min, val_max, fun, scale, description)
+        function obj = Violation(val_min, val_max, scale, description, fun_handle)
             %% Constructor
             if nargin > 0
                 
@@ -34,26 +34,25 @@ classdef Violation < handle
                 obj.scale = zeros(1, n);
                 obj.description = string.empty(0, n);
                 
-                if nargin >= 3 && ~isempty(fun)
-                    
-                    obj.fun = fun;
-                else
-                    obj.fun = @(x) x;
-                end
-                
-                if nargin < 4 || isempty(scale)
+                if nargin < 3 || isempty(scale)
                     
                     obj.scale = nan(size(val_min));
                 else
                     obj.scale = scale;
                 end
                 
-                if nargin >= 5, obj.description = description; end
+                if nargin >= 4, obj.description = description; end
+                if nargin >= 5, obj.fun_handle = fun_handle; end
                 
                 obj = obj.get_scale();
             end
             
-            addlistener(obj, 'value', 'PostSet', @obj.evaluate);
+            % addlistener(obj, 'value', 'PostSet', @obj.evaluate);
+        end
+        function obj = set.value(obj, val)
+            
+            obj.value = val;
+            obj = obj.evaluate();
         end
         function obj = get_scale(obj)
             % Look for scaling parameter if scaling parameter is empty
@@ -89,15 +88,9 @@ classdef Violation < handle
             
             obj.scale = temp;
         end
-        function obj = evaluate(obj, varargin)
+        function [obj, penalty, penalties] = evaluate(obj)
             
-%             if nargin > 1 || ~isempty(varargin)
-%                 
-%                 val = obj.fun(varargin{:});
-%             else
-                val = obj.value;
-%             end
-            
+            val = obj.value;
             mini = obj.val_min;
             maxi = obj.val_max;
             sc = obj.scale;
@@ -114,9 +107,11 @@ classdef Violation < handle
             all = con./sc;
             all(isnan(all)) = [];
 
-            obj.penalty = obj.get_penalty(all);
-            obj.penalties = all(:)';
-            % obj.value = val;
+            penalty = obj.get_penalty(all);
+            penalties = all(:)';
+            
+            obj.penalty = penalty;
+            obj.penalties = penalties;
         end
         
         function a = get.view(obj)
@@ -164,20 +159,23 @@ classdef Violation < handle
             
             pen = max(0, pen);
         end
-        function pen = get_penalty(penalties, dim)
+        function pen = get_penalty(penalties, dim, scale)
+            
+            if nargin < 2 || isempty(dim), dim = 1; end
+            if nargin < 3 || isempty(scale), scale = false; end
             
             if isvector(penalties)
                 
-                active = penalties(penalties > 0);
-                % Quad loss
-                % a = eta * sum(active(:).^2);
-                % SCV
-                pen = sum(active(:));
-            else
-                if nargin < 2 || isempty(dim), dim = 1; end
-                active = max(penalties, 0);
-                pen = sum(active, dim);
+                penalties = penalties(:);
             end
+            
+            active = max(penalties, 0);
+            % Quad loss
+            % a = eta * sum(active.^2, dim);
+            % SCV
+            pen = sum(active, dim);
+            
+            if scale, pen = pen./(size(penalties, dim)); end
         end
         function obj = test()
             

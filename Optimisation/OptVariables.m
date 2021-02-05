@@ -14,6 +14,7 @@ classdef OptVariables < Combinable
         optimise
         nOpt
         nVar
+        partition
         A
         b
         Aeq
@@ -22,6 +23,7 @@ classdef OptVariables < Combinable
     properties (Dependent)
         
         opt_var
+        view
     end
     
     methods
@@ -65,16 +67,17 @@ classdef OptVariables < Combinable
                 obj.nOpt = sum(obj.optimise);
             end
         end
-        function new = builder(obj, var, varargin)
-            
+        function parts = builder(obj, var, varargin)
+            %% TODO: Varargout to match inputs?
             [nPop, ~] = size(var);
             
             parts = varargin;
             
-            %% TODO: Needs updated for multiple parts
-            % Have nVar as vector?
-            pos_ind = 1:sum(obj.nVar);
-            cumnum = cumsum(obj.nVar);
+            n = obj.partition;
+            if isempty(n), n = obj.nVar; end
+            
+            pos_ind = 1:sum(n);
+            cumnum = cumsum(n);
             
             next = 1;
             part = 0;
@@ -85,8 +88,22 @@ classdef OptVariables < Combinable
                     part = part + 1;
                 end
                 
+                % Current variable may be vector, so choose all with same
+                % variable name 
                 current = obj.var_names(next);
+                % Variable names may repeat across parts, so only allow
+                % variables to be grabbed within current part variable 
+                % number bounds
                 con = current == obj.var_names;
+                
+                if part > 1
+                    
+                    outside = [1:cumnum(part-1), cumnum(part)+1:numel(con)];
+                else
+                    outside = cumnum(part)+1:numel(con);
+                end
+                
+                con(outside) = false;
                 
                 vari = mat2cell(var(:,con), ones(nPop, 1), sum(con));
                 
@@ -104,10 +121,10 @@ classdef OptVariables < Combinable
             
             %% Change to fully cell based
             % Cannot do earlier due to struct access above
-            for i = numel(parts):-1:1
-                
-                new(:,i) = mat2cell(parts{i}, ones(nPop, 1));
-            end
+%             for i = numel(parts):-1:1
+%                 
+%                 new(:,i) = mat2cell(parts{i}, ones(nPop, 1));
+%             end
         end
         function obj = lincon(obj)
             
@@ -209,6 +226,14 @@ classdef OptVariables < Combinable
             
             a = numel(obj.var);
         end
+        function a = get.view(obj)
+            
+            arr = 1:obj.nVar;
+            isOpt = ismember(arr, obj.opt_var)';
+            arr(isOpt) = 1:obj.nOpt;
+            arr(~isOpt) = 0;
+            a = table(obj.var_names', arr', 'VariableNames', {'name', 'opt_id'});
+        end
         function [a, b] = init(obj, method, dim)
             
             if nargin < 2 || isempty(method), method = "random"; end
@@ -239,6 +264,29 @@ classdef OptVariables < Combinable
             a = unifrnd(lbound, ubound, [dim, sum([obj.nOpt])]);
             
             b = obj.combine_var(a);
+        end
+        function v = sensitivity(obj, id, n)
+            %% Sensitivity analysis variable setup
+            % Inputs: id (int, int vector)
+            %         n  (number of steps)
+            vars = numel(id);
+            if nargin < 3 || isempty(n), n = 10; end
+            
+            if numel(n) ~= vars, n = repmat(n, vars, 1); end
+            
+            dFF = fullfact(n);
+            
+            minv = obj.var_min;
+            maxv = obj.var_max;
+            v = repmat((minv + maxv)/2, size(dFF, 1), 1);
+            
+            for i = 1:vars
+                
+                j = id(i);
+                vsens = minv(j):(maxv(j) - minv(j))/(n(i)-1):maxv(j);
+                
+                v(:,j) = vsens(dFF(:,i));
+            end
         end
         function b = combine_var(obj, opt_var)
             

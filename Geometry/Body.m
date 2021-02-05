@@ -2,13 +2,46 @@ classdef Body < Geometry
     %AFTBODY Summary of this class goes here
     %   Detailed explanation goes here
     
-    properties
+    properties (Dependent)
         
-        conical = true;
+        height
+        width
+        area
+        volume
+    end
+    
+    properties
+        conical = true
+        %% TODO: Fixes for coarse bodies in wingbody
+        % exits with ~any(nan) but interferes with first/last panels and errors
+        yDisc = 0.5:0.025:1
+        xDisc = 0.5*(1-cos(((0:80)*pi)./80))'
     end
     
     methods
-        
+        function a = get.width(obj)
+            
+            a = max(obj.y(:)) * 2;
+        end
+        function a = get.height(obj)
+            
+            zmid = obj.z(:, [end 1])';
+            a = max(diff(zmid));
+        end
+        function a = get.area(obj)
+
+            a = trapz(obj.x(:,1), max(obj.y, [], 2)); 
+        end
+        function a = get.volume(obj)
+            
+            % if isempty(obj.quad_data), obj.get_data; end
+            % data = obj.quad_data;
+            % a = 1/3 * sum(sum(dotmat(data.centre, data.unit_norm) .* data.area));
+            
+            % Calculates full volume (not half-body)
+            [~,a] = convhull([obj.x(:); obj.x(:)], [obj.y(:); -obj.y(:)], ...
+                [obj.z(:); obj.z(:)]);
+        end
     end
     
     methods (Static)

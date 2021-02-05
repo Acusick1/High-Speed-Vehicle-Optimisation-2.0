@@ -3,17 +3,16 @@ classdef BezierFoil < Aerofoil & Bezier
     properties
         
         type = "direct"
-        bez
         names
     end
     
     methods
         function [obj] = BezierFoil(control_points, type)
             
-            addlistener(obj,'control_points','PostSet',@obj.generate);
+            % addlistener(obj,'control_points','PostSet',@obj.dogenerate);
             
             if nargin > 0
-                %% TODO: Addlistener in superclass? generate > dogenerate 
+                
                 obj.control_points = control_points;
                 
                 %%
@@ -33,22 +32,13 @@ classdef BezierFoil < Aerofoil & Bezier
                 obj.set_names(vars);
             end
         end
-        function obj = generate(obj, varargin)
-            
-            % Make Bezier curves from control points
-            %% TODO
-            % combining these to be made as array of objects results in
-            % objects being the same since class was changed from value to
-            % handle
-            new_bez = ...
-                Bezier(obj.control_points(:,1:2), obj.control_points(:,3:4));
-            %%
+        function obj = dogenerate(obj, varargin)
             
             switch obj.type
                 case "tc"
                     % Bezier curves equal aerofoil thickness and camber lines
-                    t = new_bez(1).curve;
-                    c = new_bez(2).curve;
+                    t = obj.curve(:,:,1);
+                    c = obj.curve(:,:,2);
                     
                     t(:,2) = interpulinex(t, c(:,1));
                     n = Aerofoil.normal(c);
@@ -61,8 +51,8 @@ classdef BezierFoil < Aerofoil & Bezier
                 case "direct"
                     
                     % Bezier curves represent upper and lower aerofoil surfaces
-                    upper = new_bez(1).curve;
-                    lower = new_bez(2).curve;
+                    upper = obj.curve(:,:,1);
+                    lower = obj.curve(:,:,2);
                     
                     xu = upper(:,1);
                     zu = upper(:,2);
@@ -72,9 +62,8 @@ classdef BezierFoil < Aerofoil & Bezier
             
             obj.zu = obj.interp(xu, zu);
             obj.zl = obj.interp(xl, zl);
-            obj.bez = new_bez;
         end
-        function set_names(obj, vars)
+        function obj = set_names(obj, vars)
             
             [n,~] = size(obj.control_points);
             
@@ -119,8 +108,8 @@ classdef BezierFoil < Aerofoil & Bezier
             
             [aerofoil] = BezierFoil(b, type);
             aerofoil.plotter(aerofoil)
-            aerofoil.bez(1).plot
-            aerofoil.bez(2).plot
+            aerofoil.bez(1).doplot
+            aerofoil.bez(2).doplot
         end
         function [init, a] = define(type, n, crossover, zMean, zVar, edgeVar)
             
@@ -135,35 +124,42 @@ classdef BezierFoil < Aerofoil & Bezier
             % Front and end points fixed
             nFree = n - 2;
             
-            x = 1:-1/nFree:0;
-            xMin = [1, max(x - 1/nFree - crossover, 0)]';
-            xMax = [min(x + 1/nFree + crossover, 1) ,0]';
+            xlin = 1:-1/nFree:0;
+            xhcos = 1-cos((xlin*(pi/2))/max(xlin));
             
-            zlMin = [-edgeVar, repmat(-zMean - zVar, 1, nFree), 0]';
-            zlMax = [edgeVar, repmat(-zMean + zVar, 1, nFree), 0]';
+            xMin = [1, max(xhcos - 1/nFree - crossover, 0)]';
+            xMax = [min(xhcos + 1/nFree + crossover, 1) ,0]';
             
-            zuMin = [-edgeVar, repmat(zMean - zVar, 1, nFree), 0]';
-            zuMax = [edgeVar, repmat(zMean + zVar, 1, nFree), 0]';
-            
-            var_min = [xMin, zuMin, xMin, zlMin];
-            var_max = [xMax, zuMax, xMax, zlMax];
-            
-            init = (var_min + var_max)/2;
-            
-            init = BezierFoil(init, type);
-            init.order = n;
-            names = repmat("control_points", size(var_min));
-            con = strings(size(var_min));
-            
-            %% TODO: Include warning terms in build-up
-            if crossover <= 0
+            if strcmpi(type, "direct")
                 
-                ltPrev = contains(names, "x") & ~contains(names, num2str(n));
-                con(ltPrev) = "< previous";
+                zlMin = [-edgeVar/2, repmat(-zMean - zVar, 1, nFree), 0]';
+                zlMax = [edgeVar/2, repmat(-zMean + zVar, 1, nFree), 0]';
+                
+                zuMin = [-edgeVar/2, repmat(zMean - zVar, 1, nFree), 0]';
+                zuMax = [edgeVar/2, repmat(zMean + zVar, 1, nFree), 0]';
+            
+                var_min = [xMin, zuMin, xMin, zlMin];
+                var_max = [xMax, zuMax, xMax, zlMax];
+                
+            elseif strcmpi(type, "tc")
+            
+                ztMin = [0, repmat(zMean - zVar, 1, nFree), 0]';
+                ztMax = [edgeVar, repmat(zMean + zVar, 1, nFree), 0]';
+                
+                zcMin = [-edgeVar/2, repmat(0 - zVar, 1, nFree), 0]';
+                zcMax = [edgeVar/2, repmat(zMean + zVar, 1, nFree), 0]';
+                
+                var_min = [xMin, ztMin, xMin, zcMin];
+                var_max = [xMax, ztMax, xMax, zcMax];
             end
             
-            trans = [];
-            opt = true(size(var_min));
+            var_init = (var_min + var_max)/2;
+            
+            init = BezierFoil(var_init, type);
+            names = repmat("control_points", size(var_min));
+            
+            if crossover, init.con_xcp = true; end
+            if strcmpi(type, "direct"), init.con_zend = true; end
             
             % a = OptVariables(Min, Max, names, con, trans, opt);
             a.name = names(:)';

@@ -9,11 +9,8 @@ classdef Flightstate
         Machq
         delq
         Pr
-        r
-        U
         Uinf
         Tinf
-        T0
         rinf
         mu
         kt
@@ -33,11 +30,14 @@ classdef Flightstate
     end
     
     properties (Dependent)
-        
+
+        U
     end
     
     methods
         function obj = Flightstate(varargin)
+            %% Flightstate class
+            % Inputs: alpha, Mach, altitude
             
             if nargin > 0
                 
@@ -80,8 +80,6 @@ classdef Flightstate
             g = obj.gamma;
             M = obj.Minf;
             
-            obj.T0 = 1 + (g - 1)/2 * M^2;
-            
             % Freestream stagnation pressure ratio
             Pinf_P0 = (2./((g+1)*(M.^2))).^(g/(g-1)) .* ...
                 (((2*g*(M.^2))-(g-1))/(g+1)).^(1/(g-1));
@@ -92,10 +90,8 @@ classdef Flightstate
             [obj.delq, obj.Machq] = matching_point(g, Pinf_P0);
             
             obj.Pr = obj.mu .* obj.cp./obj.kt; % Prandtl number
-            obj.r = obj.Pr^0.5;
             obj.Uinf = M .* obj.a;
             obj.q = 0.5 * obj.rinf .* obj.Uinf.^2;
-            obj.U = obj.Uinf * [cos(obj.alpha), 0, sin(obj.alpha)];
         end
         function obj = maxAngles(obj, table)
             
@@ -109,9 +105,9 @@ classdef Flightstate
             obj.maxDel = angles(:,1);
             obj.maxBeta = angles(:,2);
         end
-        function a = adiabatic(obj, Te)
+        function a = get.U(obj)
             
-            a = obj.r*(obj.T0 - Te) + Te;
+            a = obj.Uinf * [cos(obj.alpha), 0, sin(obj.alpha)];
         end
     end
     

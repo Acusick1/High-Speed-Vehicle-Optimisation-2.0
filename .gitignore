@@ -9,6 +9,9 @@
 *.jpeg
 *.emp
 *.stl
+*.dat
+*.txt
+*.xlsx
 **/Results/
 **/External/
 **/Offpath/

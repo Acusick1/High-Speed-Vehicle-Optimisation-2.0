@@ -2,11 +2,77 @@ classdef Parsec < Aerofoil
     
     properties
         
+        rleu
+        xup
+        zup
+        zxxup
+        xlo
+        zlo
+        zxxlo
+        zte
+        dzte
+        ate
+        bte
+        rlel
     end
     
     methods
         
         function obj = Parsec(p)
+            
+            if nargin >= 1
+                % Coefficient Matrix Upper
+                Cup = [1 1 1 1 1 1;
+                    p(2)^(1/2) p(2)^(3/2) p(2)^(5/2) p(2)^(7/2) p(2)^(9/2) p(2)^(11/2);
+                    1/2 3/2 5/2 7/2 9/2 11/2;
+                    1/2*p(2)^(-1/2) 3/2*p(2)^(1/2) 5/2*p(2)^(3/2) 7/2*p(2)^(5/2) 9/2*p(2)^(7/2) 11/2*p(2)^(9/2);
+                    -1/4*p(2)^(-3/2) 3/4*p(2)^(-1/2) 15/4*p(2)^(1/2) 35/4*p(2)^(3/2) 63/4*p(2)^(5/2) 99/4*p(2)^(7/2);
+                    1 0 0 0 0 0];
+                
+                % Coefficient Matrix Lower
+                Clo = [1 1 1 1 1 1;
+                    p(5)^(1/2) p(5)^(3/2) p(5)^(5/2) p(5)^(7/2) p(5)^(9/2) p(5)^(11/2);
+                    1/2 3/2 5/2 7/2 9/2 11/2;
+                    1/2*p(5)^(-1/2) 3/2*p(5)^(1/2) 5/2*p(5)^(3/2) 7/2*p(5)^(5/2) 9/2*p(5)^(7/2) 11/2*p(5)^(9/2);
+                    -1/4*p(5)^(-3/2) 3/4*p(5)^(-1/2) 15/4*p(5)^(1/2) 35/4*p(5)^(3/2) 63/4*p(5)^(5/2) 99/4*p(5)^(7/2);
+                    1 0 0 0 0 0];
+                
+                %Coefficients of 'b' upper and lower
+                Bup = [p(8)+p(9)/2 p(3) tand((2*p(10)-p(11))/2) 0 p(4) sqrt(2*p(1))]';
+                
+                Blo = [p(8)-p(9)/2 p(6) tand((2*p(10)+p(11))/2) 0 p(7) -sqrt(2*p(12))]';
+                
+                Aup = Cup\Bup;
+                Alo = Clo\Blo;
+                
+                % Parsec AnAloyticAlo Formulation
+                zu = zeros(size(obj.xu));
+                zl = zeros(size(obj.xl));
+                
+                for k = 1:6
+                    
+                    zu = zu + Aup(k) .* obj.xu.^(k - 0.5);
+                    zl = zl + Alo(k) .* obj.xl.^(k - 0.5);
+                end
+                
+                obj.zu = zu;
+                obj.zl = zl;
+            end
+        end
+        function obj = dogenerate(obj)
+            
+            p(1) = obj.rleu;
+            p(2) = obj.xup;
+            p(3) = obj.zup;
+            p(4) = obj.zxxup;
+            p(5) = obj.xlo;
+            p(6) = obj.zlo;
+            p(7) = obj.zxxlo;
+            p(8) = obj.zte;
+            p(9) = obj.dzte;
+            p(10) = obj.ate;
+            p(11) = obj.bte;
+            p(12) = obj.rlel;
             
             % Coefficient Matrix Upper
             Cup = [1 1 1 1 1 1;
@@ -44,6 +110,11 @@ classdef Parsec < Aerofoil
             
             obj.zu = zu;
             obj.zl = zl;
+        end
+        function obj = set.rlel(obj, val)
+            
+            obj.rlel = val;
+            obj = obj.dogenerate;
         end
     end
     
@@ -111,12 +182,12 @@ classdef Parsec < Aerofoil
             
             obj = Parsec(p);
             a = obj.checks;
-            obj.plot(obj, comp);
+            obj.plotter(obj, comp);
             
         end
-        function a = define()
+        function [init, a] = define()
             % Standard Parsec optimisation definition
-                
+            
             var_min = [0.001, 0.2, 0.02, -1.2, 0.2, -0.08, 0, -0.02, 0, -25, 3, 0.001];
             var_max = [0.1, 0.7, 0.12, 0, 0.7, -0.02, 1.2, 0.02, 0.02, 2, 40, 0.1];
             name = ["rleu", "xup", "zup", "zxxup", "xlo", "zlo",...
@@ -125,7 +196,12 @@ classdef Parsec < Aerofoil
             trans = [];
             opt = true(size(name));
             
-            a = OptVariables(var_min, var_max, name, con, trans, opt);
+            init = Parsec();
+            a.name = name(:)';
+            a.min = var_min(:)';
+            a.max = var_max(:)';
+            a.val = (var_min(:) + var_max(:))'/2;
+            % a = OptVariables(var_min, var_max, name, con, trans, opt);
         end
     end
 end

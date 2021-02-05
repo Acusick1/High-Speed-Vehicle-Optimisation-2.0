@@ -49,9 +49,7 @@ classdef MFPSO < PSO
                 a.(fn{i}) = obj.best.(fn{i})(best_id,:);
             end
             
-            isbetter = @(a) isempty(obj.gBest) || a.cost < obj.gBest.cost;
-            
-            if isbetter(a)
+            if isempty(obj.gBest) || a.cost < obj.gBest.cost
                 
                 % Has to be run through hf cost function and rechecked
                 % against gBest
@@ -72,7 +70,8 @@ classdef MFPSO < PSO
                     end
                 end
                 
-                if isbetter(a)
+                % Recheck
+                if isempty(obj.gBest) || a.cost < obj.gBest.cost
                     
                     obj.gBest = a;
                 end

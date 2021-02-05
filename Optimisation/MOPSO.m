@@ -2,7 +2,8 @@ classdef MOPSO < PSO
     
     properties
         
-        PF = struct('variables', [], 'cost', [], 'penalty', [], 'nDom', [])
+        PF = struct('variables', [], 'cost', [], 'penalty', [], ...
+            'penalties', [], 'nDom', [])
         maxPF = 100
     end
     
@@ -16,7 +17,7 @@ classdef MOPSO < PSO
             obj = obj.update_cost();
             obj = obj.constraint_tolerance();
             
-            e = obj.con_tol(1);
+            e = obj.con_tol(1,:);
             
             obj = obj.update_PF(e);
             
@@ -39,7 +40,10 @@ classdef MOPSO < PSO
                 obj.hist(1).(fn{j})(con,:) = obj.gBest.(fn{j})(con,:);
             end
             
-            save(fullfile(obj.save_dir, 'Init'));
+            if ~isempty(obj.save_it)
+                
+                save(fullfile(obj.save_dir, 'Init'));
+            end
             
             for i = 2:obj.maxIt + 1
                 
@@ -50,7 +54,61 @@ classdef MOPSO < PSO
                     obj.uni_mutation(obj.variables(sets(:,2), :));
                 
                 obj.variables(sets(:,3), :) =...
-                    obj.nonuni_mutation(obj.variables(sets(:,3), :), i);
+                    obj.nonuni_mutation(obj.variables(sets(:,3), :), i-1);
+                
+                obj = obj.update_cost();
+                
+                e = obj.con_tol(i,:);
+                obj = obj.update_PF(e);
+                
+                % distance = Population.crowding(obj.PF.cost);
+                distance = distancecrowding([],obj.PF.cost);
+                best_id(1) = obj.roulette(obj.PF.nDom);
+                best_id(2) = obj.roulette(distance, true);
+                % best_id(2) = obj.roulette(obj.PF.nDom, true);
+                
+                obj = obj.update_best(e);
+                obj = obj.update_gBest(best_id);
+                
+                for j = 1:length(fn)
+                    
+                    obj.hist(i,:).(fn{j})(con,:) = obj.gBest.(fn{j})(con,:);
+                end
+                
+                time = toc;
+                
+                pf_pen = obj.PF.penalty;
+                pf_pen(isnan(pf_pen)) = 0;
+                
+                if obj.verbose
+                    
+                    fprintf(['Iteration %i: Mean PF f(x): ' str ' p(x): %4.2f e: %4.2f nPF: %i Success rate: %i t(it): %4.2f\n'], i-1, mean(obj.PF.cost, 1), mean(pf_pen(:)), mean(obj.con_tol(i-1,:)), size(obj.PF.cost, 1), sum(all(isfinite(obj.cost), 2))/obj.nPop*100, time);
+                end
+                
+                if any(i-1 == obj.save_it)
+                    
+                    obj.save_opt(i);
+                    %% Attempt to reset parpool to avoid OOM errors
+                    if ~isempty(gcp('nocreate')), delete(gcp); end
+                end
+            end
+        end
+        function obj = main_loop(obj, sets, fn, i)
+            
+            if nargin < 4 || isempty(i), i = 2; end
+            
+            str = repmat('%4.3f ', 1, obj.nFun);
+            
+            for i = i:obj.maxIt + 1
+                
+                tic
+                obj = obj.update_position();
+                
+                obj.variables(sets(:,2), :) =...
+                    obj.uni_mutation(obj.variables(sets(:,2), :));
+                
+                obj.variables(sets(:,3), :) =...
+                    obj.nonuni_mutation(obj.variables(sets(:,3), :), i-1);
                 
                 obj = obj.update_cost();
                 
@@ -65,16 +123,23 @@ classdef MOPSO < PSO
                 
                 for j = 1:length(fn)
                     
-                    obj.hist(i,:).(fn{j})(con,:) = obj.gBest.(fn{j})(con,:);
+                    obj.hist(i,:).(fn{j}) = obj.gBest.(fn{j});
                 end
                 
                 time = toc;
+                pf_pen = obj.PF.penalty;
+                pf_pen(isnan(pf_pen)) = 0;
                 
-                fprintf(['Iteration %i: Mean PF f(x): ' str ' p(x): %4.2f e: %4.2f nPF: %i Success rate: %i t(it): %4.2f\n'], i-1, mean(obj.PF.cost, 1), mean(obj.PF.penalty), obj.conTol(i-1), size(obj.PF.cost, 1), sum(all(isfinite(obj.cost), 2))/obj.nPop*100, time);
+                if obj.verbose
+                 
+                    fprintf(['Iteration %i: Mean PF f(x): ' str ' p(x): %4.2f e: %4.2f nPF: %i Success rate: %i t(it): %4.2f\n'], i-1, mean(obj.PF.cost, 1), mean(pf_pen(:)), mean(obj.con_tol(i-1,:)), size(obj.PF.cost, 1), sum(all(isfinite(obj.cost), 2))/obj.nPop*100, time);
+                end
                 
-                if any(i-1 == obj.saveIt)
+                if any(i-1 == obj.save_it)
                     
                     obj.save_opt(i);
+                    %% Attempt to reset parpool to avoid OOM errors
+                    delete(gcp)
                 end
             end
         end
@@ -82,7 +147,9 @@ classdef MOPSO < PSO
 
             if nargin < 2 || isempty(con_tol), con_tol = inf; end
             
-            %% TODO: This or below
+            %% TODO: Ensure PF are saved as bests?
+            % Which PF particles are external to best, only include those
+            % in combi population to avoid duplicates
             [nPF, ~] = size(obj.PF.cost);
             external = false(nPF, 1);
             for i = 1:nPF
@@ -92,38 +159,60 @@ classdef MOPSO < PSO
             
             fn = fieldnames(obj.best);
             for i = 1:length(fn)
-                %% TODO: This or above
-                % Only need to compare current population with pareto front
-                % Including best leads to unnecessary duplicates
-                %% TODO: Ensure PF are saved as bests?
+            
                 combi.(fn{i}) = [obj.(fn{i}); obj.best.(fn{i}); ...
                     obj.PF.(fn{i})(external,:)];
             end
             
-            feasible = combi.penalty <= con_tol;
+            %% TODO: If con_tol == 0, one group?
+            pen_is_nan = isnan(combi.penalty);
+            groups = unique(pen_is_nan, 'rows');
             
-            [obj.PF.cost, PF_ID, obj.PF.nDom] = ...
-                population.nondominated(combi.cost, feasible);
+            for i = size(groups, 1):-1:1
+                
+                con = find(all(pen_is_nan == groups(i,:), 2));
+                
+                [~, pf_ID_group, pf_nDom_group] = ...
+                    Population.nondominated(combi.cost(con,:), combi.penalty(con,:), con_tol);
+                
+                pf_ID{i} = con(pf_ID_group)';
+                pf_nDom{i} = pf_nDom_group';
+            end
             
-            obj.PF.variables = combi.variables(PF_ID,:);
-            obj.PF.penalty = combi.penalty(PF_ID,:);
+            
+            [pf_ID, idx] = sort([pf_ID{:}]);
+            pf_nDom = [pf_nDom{:}];
+            obj.PF.nDom = pf_nDom(idx)';
+            
+            fn = fieldnames(combi);
+            
+            for i = 1:numel(fn)
+                
+                if ~isempty(combi.(fn{i}))
+                    
+                    obj.PF.(fn{i}) = combi.(fn{i})(pf_ID,:);
+                end
+            end
             
             if size(obj.PF.cost, 1) > obj.maxPF
                 
-                [~, id] = population.maxpf(obj.PF.cost, obj.maxPF);
+                [~, id] = Population.limit_pf(obj.PF.cost, obj.maxPF);
                 
                 fn = fieldnames(obj.PF);
                 for i = 1:length(fn)
                     
-                    obj.PF.(fn{i}) = obj.PF.(fn{i})(id, :);
+                    if ~isempty(obj.PF.(fn{i}))
+                        
+                        obj.PF.(fn{i}) = obj.PF.(fn{i})(id, :);
+                    end
                 end
             end
         end
         function obj = update_gBest(obj, best_id)
             
             if nargin < 2
-                %% TODO: Single gBest
-                % best_id = pso.roulette(obj.PF.cost, true);
+                
+                best_id = GlobalOptimisation.roulette(obj.PF.nDom, true);
             end
             
             % Replicate to ensure size consistency with population
@@ -132,9 +221,26 @@ classdef MOPSO < PSO
             fn = fieldnames(obj.PF);
             for i = 1:length(fn)
                 
-                obj.gBest.(fn{i}) = ...
-                    repmat(obj.PF.(fn{i})(best_id,:), rep, 1);
+                if ~isempty(obj.PF.(fn{i}))
+                    
+                    obj.gBest.(fn{i}) = ...
+                        repmat(obj.PF.(fn{i})(best_id,:), rep, 1);
+                end
             end
+        end
+    end
+    
+    methods (Static)
+        
+        function obj = restart(opt_file)
+            %% TODO: Opt_file should be opt folder, otherwise Init overwritten
+            %% TODO: Put i into obj, take from there
+            load('Init', 'sets', 'fn')
+            load(opt_file, 'obj')
+            i = regexp(find_file('it'), '\d*', 'Match');
+            i = str2double(i{end}) + 1;
+            
+            obj = obj.main_loop(sets, fn, i);
         end
     end
 end

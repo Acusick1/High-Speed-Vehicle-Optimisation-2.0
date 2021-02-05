@@ -9,7 +9,7 @@ classdef PSO < GlobalOptimisation
         c3 = 0.149
         var_size
         par_vel
-        best = struct('variables', [], 'cost', [], 'penalty', [])
+        best = struct('variables', [], 'cost', [], 'penalty', [], 'penalties', [])
         gBest
         hist
         gBest_method = "combi"
@@ -27,7 +27,7 @@ classdef PSO < GlobalOptimisation
             obj.lb = lb(:)';
             obj.ub = ub(:)';
             obj.nVar = numel(lb);
-            obj.mut_prob = 1/obj.nVar;
+            obj.mut_prob = min(1/obj.nVar, 0.05);
             obj.nPop = nPop;
             obj.cost_fun = cost_fun;
             
@@ -48,8 +48,22 @@ classdef PSO < GlobalOptimisation
             obj.penalty = zeros(obj.nPop, 1);
         end
         function obj = update_cost(obj)
+            %% TODO: Hacky
+            % Allows combined cost/vio functions to be used (default) along
+            % with cost only functions
+            try
+                [obj.cost, obj.penalty, obj.penalties] = obj.cost_fun(obj.variables);
+            catch
+                obj.cost = obj.cost_fun(obj.variables);
+            end
             
-            [obj.cost, obj.penalty, obj.penalties] = obj.cost_fun(obj.variables);
+            if isempty(obj.vio_fun)
+                
+                obj.penalties = zeros(obj.nPop, 1);
+            else
+                obj.penalties = max(0, obj.vio_fun(obj.variables));
+                obj.penalty = sum(obj.penalties, 2);
+            end
         end
         function obj = init_best(obj)
             
@@ -107,11 +121,13 @@ classdef PSO < GlobalOptimisation
             id = Population.dominance(obj.cost, obj.best.cost, obj.penalty, obj.best.penalty, con_tol);
             con = id == 1;
             
-            %% TODO: Replace with one-liner structfun()
             fn = fieldnames(obj.best);
             for i = 1:length(fn)
                 
-                obj.best.(fn{i})(con,:) = obj.(fn{i})(con,:);
+                if ~isempty(obj.(fn{i}))
+                    
+                    obj.best.(fn{i})(con,:) = obj.(fn{i})(con,:);
+                end
             end
         end
         function obj = update_gBest(obj, e)
@@ -202,8 +218,10 @@ classdef PSO < GlobalOptimisation
                 
                 obj = obj.update_intertia(wc);
                 
-                fprintf('Iteration %i: f(x): %4.2f p(x): %4.2f\n', i-1, obj.gBest.cost, obj.gBest.penalty);
-
+                if obj.verbose
+                    
+                    fprintf('Iteration %i: f(x): %4.2f p(x): %4.2f\n', i-1, obj.gBest.cost, obj.gBest.penalty);
+                end
             end
         end
         function obj = main(obj)
@@ -244,7 +262,7 @@ classdef PSO < GlobalOptimisation
                     obj.uni_mutation(obj.variables(sets(:,2), :));
                 
                 obj.variables(sets(:,3), :) =...
-                    obj.nonuni_mutation(obj.variables(sets(:,3), :), i);
+                    obj.nonuni_mutation(obj.variables(sets(:,3), :), i-1);
                 
                 obj = obj.update_cost();
                 obj = obj.update_best(obj.con_tol(i));
@@ -266,7 +284,13 @@ classdef PSO < GlobalOptimisation
                 obj = obj.update_intertia(wc);
                 time = toc;
                 
-                fprintf('Iteration %i: f(x): %4.2f p(x): %4.2f e(it): %4.2f t(it): %4.2f\n', i-1, obj.gBest.cost, obj.gBest.penalty, obj.con_tol(i-1), time);
+                if obj.verbose
+                    
+                    fprintf('Iteration %i: f(x): %4.2f p(x): %4.2f e(it): %4.2f t(it): %4.2f\n', i-1, obj.gBest.cost, obj.gBest.penalty, obj.con_tol(i-1), time);
+                end
+                
+                obj.it = i - 1;
+                if obj.stall >= obj.maxStall, break; end
             end
         end
     end

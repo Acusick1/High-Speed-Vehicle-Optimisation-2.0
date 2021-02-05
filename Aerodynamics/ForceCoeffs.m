@@ -3,12 +3,12 @@ classdef ForceCoeffs < Combinable
     properties
         
         Cl
-        Cd
+        Cdp
         Cm
         CN
         CA
         Cf
-        Aref
+        Cd
     end
     
     methods
@@ -22,7 +22,7 @@ classdef ForceCoeffs < Combinable
                 yzAngle = pi/2 - alpha;
                 
                 area = data.area;
-                unit_norm = data.unitNorm;
+                unit_norm = data.unit_norm;
                 
                 %%
                 nx = unit_norm(:,:,1);
@@ -36,14 +36,18 @@ classdef ForceCoeffs < Combinable
                     ((Cp .* area .* ny) * sin(xzAngle)) -...
                     ((Cp .* area .* nz) * sin(yzAngle));
                 
-                f.Cd = -((Cp .* area .* nx) * sin(yzAngle)) +...
+                f.Cdp = -((Cp .* area .* nx) * sin(yzAngle)) +...
                     ((Cp .* area .* ny) * sin(xzAngle)) -...
                     ((Cp .* area .* nz) * sin(xyAngle));
                 
                 f.Cm = -(Cp .* area .* nx) + (Cp .* area .* nz);
                 f.CN = -Cp .* area .* nz;
                 f.CA = -Cp .* area .* nx;
-                f.Cf = Cf;
+                
+                if ~isempty(Cf)
+                 
+                    f.Cf = Cf .* area;
+                end
                 
                 %% Sum and normalise coefficients
                 fn = fieldnames(f);
@@ -52,8 +56,15 @@ classdef ForceCoeffs < Combinable
                     
                     obj.(fn{i}) = sum(f.(fn{i})(:))/Aref;
                 end
+            end
+        end
+        function a = get.Cd(obj)
+            
+            if isempty(obj.Cf)
                 
-                obj.Aref = Aref;
+                a = obj.Cdp;
+            else
+                a = obj.Cdp + obj.Cf;
             end
         end
     end

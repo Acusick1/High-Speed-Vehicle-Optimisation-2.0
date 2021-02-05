@@ -1,19 +1,22 @@
 classdef Wingsection < Geometry
     
-    properties (SetObservable)
+    properties %(SetObservable)
         
         chord
         span
         trail_sweep
-        sections = Aerofoil.getaerofoil("NACA0006");
+        sections = Aerofoil.getaerofoil("NACA0006")
         dihedral
         offset = [0 0]
     end
     
     properties
         
-        xDisc (1,1) string {mustBeMember(xDisc,{'Linear', 'Cosine', 'Halfcosine'})} = 'Cosine'
-        yDisc = 0.25
+        xDisc (1,1) string {mustBeMember(xDisc,{'Linear', 'Cosine', 'Halfcosine'})} = 'Linear'
+        % Set to positive number to discretise wing by target dim yDisc
+        yDisc = 0
+        nParts
+        nPanels
     end
     
     properties (Dependent)
@@ -25,7 +28,8 @@ classdef Wingsection < Geometry
         lead_sweep
         upper
         lower
-        nParts
+        AR
+        Sref
     end
     
     properties (Constant)
@@ -41,18 +45,18 @@ classdef Wingsection < Geometry
             if nargin > 0
                 
                 obj.chord = chord;
-                obj.span = span;
                 obj.trail_sweep = sweep;
                 obj.dihedral = di;
                 obj.sections = sections;
+                obj.span = span;
             end
             
-            addlistener(obj,'chord','PostSet',@obj.initialise);
-            addlistener(obj,'span','PostSet',@obj.initialise);
-            addlistener(obj,'trail_sweep','PostSet',@obj.initialise);
-            addlistener(obj,'dihedral','PostSet',@obj.initialise);
-            addlistener(obj,'sections','PostSet',@obj.initialise);
-            addlistener(obj,'offset','PostSet',@obj.initialise);
+%             addlistener(obj,'chord','PostSet',@obj.initialise);
+%             addlistener(obj,'span','PostSet',@obj.initialise);
+%             addlistener(obj,'trail_sweep','PostSet',@obj.initialise);
+%             addlistener(obj,'dihedral','PostSet',@obj.initialise);
+%             addlistener(obj,'sections','PostSet',@obj.initialise);
+%             addlistener(obj,'offset','PostSet',@obj.initialise);
         end
         function obj = dogenerate(obj)
             
@@ -61,6 +65,8 @@ classdef Wingsection < Geometry
             di = [0 obj.dihedral];
             LE = obj.lead_edge;
             aerofoils = obj.sections;
+            
+            obj.nParts = numel(chords) - 1;
             
             xu = [aerofoils.xu] .* chords + LE(:,:,1);
             zu = [aerofoils.zu] .* chords;
@@ -77,7 +83,25 @@ classdef Wingsection < Geometry
             obj.x = obj.wrap(xu, xl) + obj.offset(1);
             obj.y = obj.wrap(yu_rot, yl_rot);
             obj.z = obj.wrap(zu_rot, zl_rot) + obj.offset(2);
-            obj.get_data;
+            
+            if obj.yDisc
+                
+                obj.span_disc;
+            else
+                obj.nPanels = ones(1, obj.nParts);
+            end
+        end
+        function a = check(obj, id)
+            %% TODO: This (id) or docheck as in Aerofoil
+            maxTE = max(obj.upper(end,:,3) - obj.lower(end,:,3));
+            jointDiff = min(obj.upper(:,1,2) - obj.lower(:,1,2));
+            
+            a = [min(obj.lead_sweep), jointDiff, maxTE];
+            
+            if nargin >= 2 && ~isempty(id)
+                
+                a = a(id);
+            end
         end
         function stag = stagnation(obj, U)
             
@@ -94,20 +118,38 @@ classdef Wingsection < Geometry
             
             id = mode(id);
         end
-        function set.chord(obj, in)
+        function obj = set.chord(obj, in)
             
-            % Ensuring taper ratio <= 1
+            maxTaper = 0.8;
+            % Ensuring taper ratio <= 0.8
             for i = 2:numel(in)
                 
-                if in(i) > in(i-1)
+                if in(i) > in(i-1) * maxTaper
                     
-                    in(i) = in(i-1);
+                    in(i) = in(i-1) * maxTaper;
                 end
             end
             
             obj.chord = in;
         end
-        function set.sections(obj, in)
+        function obj = set.trail_sweep(obj, in)
+            
+            deltaMax = deg2rad(20);
+            % Constraining sweep on either side of max difference
+            for i = 2:numel(in)
+                
+                in(i) = max(min(in(i), in(i-1) + deltaMax), in(i-1) - deltaMax);    
+            end
+            
+            obj.trail_sweep = in;
+        end
+        function obj = set.dihedral(obj, in)
+            % Dihedral can only increase outboard
+            for i = 2:numel(in), in(i) = max(in(i-1:i)); end
+            
+            obj.dihedral = in;
+        end
+        function obj = set.sections(obj, in)
             
             obj.sections = obj.clean_sections(in);
         end
@@ -122,8 +164,7 @@ classdef Wingsection < Geometry
             a(:,:,3) = zTE;
         end
         function a = get.lead_sweep(obj)
-            
-            a = zeros(size(obj.span));
+            %% Leading edge sweep calculation
             
             x_le = obj.lead_edge(:,:,1);
             diff_le = diff(x_le);
@@ -131,28 +172,22 @@ classdef Wingsection < Geometry
             
             neg = diff_le < 0;
             
-            % Positive sweep calculation
-            a(~neg) = acos(obj.span/hyp);
-            % Negative sweep calculation
-            a(neg) = -(pi/2 - asin(obj.span/hyp));
+            a = acos(obj.span./hyp);
+            
+            a(neg) = -a(neg);
             a(diff_le == 0) = 0;
-        end
-        function a = get.nParts(obj)
-            
-            one = max(length(obj.span), length(obj.trail_sweep));
-            two = max(length(obj.chord), length(obj.sections)) - 1;
-            
-            a = max(one, two);
         end
         function obj = span_disc(obj)
             
             target = obj.yDisc;
-            up = fun(obj.upper);
+            nPan = 0;
             lo = fun(obj.lower);
+            up = fun(obj.upper);
             
             obj.x = obj.wrap(up(:,:,1), lo(:,:,1));
             obj.y = obj.wrap(up(:,:,2), lo(:,:,2));
             obj.z = obj.wrap(up(:,:,3), lo(:,:,3));
+            obj.nPanels = nPan;
             
             function b = fun(a)
                 
@@ -161,20 +196,24 @@ classdef Wingsection < Geometry
                 [xDim, yDim] = size(yz);
                 
                 yzBar = mean(yz, 1);
-                
                 dist = diff(yzBar);
-                % + 1 to give number of points, not number of panels
-                n = ceil(dist./target) + 1;
-                b = zeros(xDim, sum(n) + numel(n) - 1, 3);
                 
-                cols = [0 cumsum(n)] + 1;
+                % Number of panels, defined once for upper/lower
+                % consistency
+                if nPan == 0
+                    
+                    nPan = ceil(dist./target);
+                end
+                
+                % + 1 to give number of points
+                b = zeros(xDim, sum(nPan) + 1, 3);
+                
+                cols = [0 cumsum(nPan)] + 1;
                 
                 for i = 1:yDim - 1
                     
-                    disc = (0:dist(i)/n(i):dist(i)) + yzBar(i);
-                    
                     c = cols(i):cols(i+1);
-                    b(:,c,:) = a(:,i,:) + (a(:,i+1,:) - a(:,i,:)).*((0:n(i))/n(i));
+                    b(:,c,:) = a(:,i,:) + (a(:,i+1,:) - a(:,i,:)).*((0:nPan(i))/nPan(i));
                 end
             end
         end
@@ -200,7 +239,7 @@ classdef Wingsection < Geometry
         end
         function a = get.upper(obj)
             
-            p = obj.Points;
+            p = obj.points;
             
             [~,dim,~] = size(p);
             
@@ -208,7 +247,7 @@ classdef Wingsection < Geometry
         end
         function a = get.lower(obj)
             
-            p = obj.Points;
+            p = obj.points;
             
             [~,dim,~] = size(p);
             
@@ -216,7 +255,11 @@ classdef Wingsection < Geometry
         end
         function a = get.area(obj)
             
-            a = 0.5 * sum(obj.chord) * obj.span;
+            for i = numel(obj.span):-1:1
+                
+                a(i) = 0.5 * sum(obj.chord(i:i+1)) * ... 
+                    obj.span(i) * cos(obj.dihedral(i));
+            end
         end
         function a = get.taper(obj)
             
@@ -226,6 +269,17 @@ classdef Wingsection < Geometry
             
             t = obj.taper;
             a = (2/3) * obj.chord(1:end-1) .* ((1 + t + (t.^2))./(1 + t));
+        end
+        function a = get.AR(obj)
+            %% TODO: Remove area = 0 partitions
+            a = obj.span.^2./obj.area;
+            a(isnan(a)) = 0;
+        end
+        function sweep = get_sweep(obj, loc)
+            
+            sweep = atan(tan(obj.trail_sweep) - 4./obj.AR * ...
+                (loc - 1) .* (1 - obj.taper)./(1 + obj.taper));
+            sweep(isnan(sweep)) = 0;
         end
         function section = clean_sections(obj, in)
             
@@ -257,16 +311,16 @@ classdef Wingsection < Geometry
     end
     
     methods (Static)
-        function plot()
-            
-        end
         function [init_obj, a] = define()
             
-            a(1) = struct('name', "chord", 'min', [0.25 0.25 0.25], 'max', [1.5 1.5 1.5]);
-            a(2) = struct('name', "span", 'min', [0.5 0.5], 'max', [5 5]);
-            a(3) = struct('name', "trail_sweep", 'min', [0 0], 'max', [1.4 1.4]);
+            a(1) = struct('name', "chord", 'min', [0.4 0.25 0.1], 'max', [1.5 1 0.75]);
+            a(2) = struct('name', "span", 'min', [0.2 0.1], 'max', [0.9 0.8]);
+            % a(2) = struct('name', "span", 'min', [0.5 0.5], 'max', [5 5]);
+            a(3) = struct('name', "trail_sweep", 'min', -[pi/4 pi/4], 'max', [pi/4 pi/4]);
             a(4) = struct('name', "dihedral", 'min', [0 0], 'max', [pi/4 pi/4]);
-            a(5) = struct('name', "offset", 'min', [0.1 -0.4], 'max', [0.6 0.4]);
+            % Scaled by body length and height. min z-offset lower than
+            % body to allow for high dihedral partitions
+            a(5) = struct('name', "offset", 'min', [0.1 -1.5], 'max', [0.6 -0.05]);
             
             init_obj = Wingsection();
             [init_obj, a] = Geometry.define(init_obj, a);

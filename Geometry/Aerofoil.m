@@ -1,15 +1,17 @@
-classdef Aerofoil < handle
+classdef Aerofoil% < handle
     
     properties
         
         rescale = false
         xu = (0:0.01:1)'
         xl = (0:0.01:1)'
+%         xu = 0.5*(1-cos(((0:0.01:1)*pi)))'
+%         xl = 0.5*(1-cos(((0:0.01:1)*pi)))'
         conical = false
         checks
     end
     
-    properties (SetObservable)
+    properties %(SetObservable)
         
         zu
         zl
@@ -17,6 +19,7 @@ classdef Aerofoil < handle
     
     properties (Dependent)
         
+        data
         coords
         area
         thickness
@@ -29,9 +32,10 @@ classdef Aerofoil < handle
         
         xLEr = 0.01
         % Minimum allowable thickness
-        tMin = 1e-3;
+        minThick = 1e-8;
         % Percentage of chord near LE/TE to remove from min thickness fixing
         edge = 0.05;
+        maxTE = 0.05;
     end
     
     methods
@@ -41,6 +45,8 @@ classdef Aerofoil < handle
                 if nargin == 1
                     
                     coords = varargin{:};
+                    [~, front_id] = min(coords(:,1));
+                    coords = coords - coords(front_id,:);
                     
                 elseif nargin == 2
                     
@@ -65,7 +71,27 @@ classdef Aerofoil < handle
                 end
             end
             
-            addlistener(obj, 'zl', 'PostSet', @obj.check);
+            % addlistener(obj, 'zl', 'PostSet', @obj.check);
+        end
+        function data = get.data(obj)
+            
+            upNorm = Aerofoil.normal([obj.xu obj.zu]);
+            loNorm = -Aerofoil.normal([obj.xl obj.zl]);
+            
+            norm(:,:,1) = [upNorm(:,1) loNorm(:,1)];
+            norm(:,:,3) = [upNorm(:,2) loNorm(:,2)];
+            
+            mag_norm = magmat(norm);
+            unit_norm = norm./mag_norm;
+            points = reshape([obj.xu obj.xl obj.zu obj.zl], [], 2, 2);
+            mag = magmat(diff(points, 1, 1));
+            centre = (points(1:end-1,:,:) + points(2:end,:,:))/2;
+            
+            data.norm = norm;
+            data.mag = mag_norm;
+            data.unit_norm = unit_norm;
+            data.area = mag;
+            data.centre = centre;
         end
         function obj = coordstoxz(obj, coords)
             
@@ -89,22 +115,26 @@ classdef Aerofoil < handle
                 if ~isequal(upper(:,1), obj.xu)
                     
                     obj.zu = obj.interp(upper);
+                    % obj.zu = obj.interp(upper, [], [], 'pchip');
                 end
                 if ~isequal(lower(:,1), obj.xl)
                     
                     obj.zl = obj.interp(lower);
+                    % obj.zl = obj.interp(lower, [], [], 'pchip');
                 end
             end
         end
         function obj = redist(obj, x)
             
-            obj.zu = obj.interp(obj.xu, obj.zu, x);
-            obj.zl = obj.interp(obj.xl, obj.zl, x);
+            zup = obj.interp(obj.xu, obj.zu, x);
+            zlo = obj.interp(obj.xl, obj.zl, x);
             obj.xu = x;
             obj.xl = x;
+            obj.zu = zup;
+            obj.zl = zlo;
         end
         function obj = nondim(obj)
-            
+            %% TODO: nondim in x, translate in x and z
             minx = min(obj.coords(:,1));
             maxx = max(obj.coords(:,1));
             
@@ -132,7 +162,7 @@ classdef Aerofoil < handle
                 obj.zl = obj.zl + z;
             end
         end
-        function out = interp(obj, x, y, xq)
+        function out = interp(obj, x, y, xq, varargin)
             
             if nargin < 3 || isempty(y)
                 
@@ -140,16 +170,17 @@ classdef Aerofoil < handle
                 x = x(:,1);
             end
             
-            if nargin < 4, xq = obj.xu; end
+            if nargin < 4 || isempty(xq), xq = obj.xu; end
+            if nargin < 5, varargin = {'linear', 'extrap'}; end
             
             try
-                out = interp1(x, y, xq, 'linear', 'extrap');
+                out = interp1(x, y, xq, varargin{:});
             catch
                 [~, unique_id] = unique(x);
                 x = x(unique_id,:);
                 y = y(unique_id,:);
                 
-                out = interp1(x, y, xq, 'linear', 'extrap');
+                out = interp1(x, y, xq, varargin{:});
             end
         end
         function obj = closeTrailEdge(obj)
@@ -164,18 +195,28 @@ classdef Aerofoil < handle
             a = [flipud([obj.xu, obj.zu]);
                 obj.xl(2:end), obj.zl(2:end)];
         end
-        function obj = check(obj, varargin)
+        function a = check(obj, varargin)
             
-            % varargin only here for event args
-            [a(1), ~, a(2)] = obj.check_curve("upper");
-            [a(3), ~, a(4)] = obj.check_curve("lower");
-            [a(5), a(6), a(7), a(8)] = obj.check_curve("thickness");
-            [obj, a(9)] = obj.check_thickness();
+            % varargin only here for event args or id
+            
+            [du_f, du_f2, ~, uMaxLoc] = obj.check_curve("upper");
+            % [a(3), ~, ~, a(4)] = obj.check_curve("lower");
+            [dt_f, ~, dt_r, tMaxLoc, tMax] = obj.check_curve("thickness");
+            [~, tMin] = obj.check_thickness();
             LE = obj.lead_edge;
-            a([10 11]) = LE.radius;
-            obj.checks = a;
+            LE = LE.radius;
+            %a(12) = obj.thickness(end);
+            
+            a = [du_f, uMaxLoc, dt_f, dt_r, tMaxLoc, tMax, tMin, LE(1), ...
+                LE(2), du_f2];
+            
+            if ~isempty(varargin) && isnumeric(varargin{1})
+                
+                id = varargin{1}; 
+                a = a(id);
+            end
         end
-        function [d_f, d_r, cLoc, Max] = check_curve(obj, which)
+        function [d_f, d_f2, d_r, cLoc, Max] = check_curve(obj, which)
             
             switch which
                 case "upper"
@@ -213,6 +254,7 @@ classdef Aerofoil < handle
             end
             
             grad_f = grad(1:ID - 1);
+            grad_f2 = diff(grad_f)./((diff(x(1:ID-1)) + diff(x(2:ID)))/2);
             grad_r = grad(ID:length(grad));
             
             if any(grad_f < 0)
@@ -220,6 +262,17 @@ classdef Aerofoil < handle
                 d_f = sum(grad_f(grad_f < 0));
             else
                 d_f = min(grad_f);
+            end
+            
+            if any(grad_f2 > 0)
+                
+                d_f2 = sum(grad_f2(grad_f2 > 0));
+            
+            elseif isempty(grad_f2)
+                
+                d_f2 = 0;
+            else
+                d_f2 = max(grad_f2);
             end
             
             if any(grad_r > 0)
@@ -231,7 +284,7 @@ classdef Aerofoil < handle
             
             if which == "lower", d_f = -d_f; d_r = -d_r; end
         end
-        function [obj, out] = check_thickness(obj)
+        function [obj, tMin] = check_thickness(obj)
             
             c = obj.camber;
             t = obj.thickness;
@@ -239,21 +292,11 @@ classdef Aerofoil < handle
             % Alter aerofoil if any thickness is < 0 or less than minimum thickness
             % outside of leading and trailing edges
             inner = c(:,1) > 0 & c(:,1) < 1;
-            tFix = (t < obj.tMin & inner) | t < 0;
+            tFix = (t < obj.minThick & inner) | t < 0;
 
             obj = obj.fix_thickness(tFix);
-          
-            % If any negative values exist, provide minimum for penalty function
-            % If no negative value exists, smallest thickness value outside of edges
-            % will be returned. In this case, no penalty will be applied, but it
-            % provides some continuity in the constraint function as opposed to always
-            % returning a min value of zero (ie. at LE)
-            if any(tFix)
-                
-                out = sum(t(tFix));
-            else
-                out = min(t);
-            end
+
+            tMin = min(t(inner));
         end
         function obj = fix_thickness(obj, con)
             
@@ -261,7 +304,7 @@ classdef Aerofoil < handle
             n = obj.normal(c);
             
             % Resetting thickness to min value perpendicular to camber line
-            t = obj.tMin/2;
+            t = obj.minThick/2;
             
             cc = (c(1:end-1,:) + c(2:end,:))/2;
             
@@ -301,35 +344,67 @@ classdef Aerofoil < handle
             
             a = obj.zu(end,:) - obj.zl(end,:);
         end
+        function plot(obj, figNum)
+            
+            if nargin >= 2 && isnumeric(figNum)
+            
+                f = figure(figNum);
+            else
+                f = figure;
+            end
+            
+            ax = f.Children;
+            
+            if isempty(ax)
+                
+                nLines = 0;
+            else
+                nLines = numel(f.Children.Children);
+            end
+            
+            lineSpec = {'k-', 'k--', 'k-.'};
+            
+            hold on
+            plot(obj.coords(:,1), obj.coords(:,2), lineSpec{nLines+1})
+            latexfigure()
+            hold off
+        end
     end
     
     methods (Static)
-        function [aerofoil, file_names] = getaerofoil(names)
+        function [aerofoil, file_names] = getaerofoil(names, path, id)
             
-            preloaded_dir = fullfile(pwd, 'Geometry', 'DataFiles');
-            
-            if nargin < 1
+            if nargin < 1 || isempty(names)
                 
-                names = 'dat';
+                names = '.dat';
+            end
+            if nargin < 2 || isempty(path)
+                
+                path = fullfile(pwd, 'Geometry', 'DataFiles');
             end
             
-            files = dir(preloaded_dir);
+            files = dir(path);
             file_names = convertCharsToStrings(...
                 arrayfun(@(x) x.name, files, 'UniformOutput', false));
             
             file_names = file_names(contains(file_names, names, 'IgnoreCase', true));
             
+            if nargin >= 3 && ~isempty(id)
+                
+                file_names = file_names(id);
+            end
+            
             for i = numel(file_names):-1:1
                 
                 try
-                    str = fullfile(preloaded_dir, file_names(i));
+                    str = fullfile(path, file_names(i));
                 catch
-                    str = join([preloaded_dir, file_names(i)], '/');
+                    str = join([path, file_names(i)], '/');
                 end
                 
                 fid = fopen(str,'r');
                 data = textscan(fid, '%f%f', 'HeaderLines', 1, 'Collect', 1);
-                aerofoil = Aerofoil(data{1});
+                aerofoil(i,:) = Aerofoil(data{1});
                 fclose(fid);
             end
         end
@@ -338,12 +413,16 @@ classdef Aerofoil < handle
             [nx, nz] = normal2D(c(:,1), c(:,2));
             a = [nx, nz];
         end
-        function a = violation()
+        function a = violation(id)
             
-            a = Violation([0, 0.15, nan, 0.1, 0, 0.15, 0.05, 0, 0.005, 0.005], ...
-                [nan, 0.65, 0, 0.65, nan, 0.65, 0.15, nan, nan, nan], [], ...
-                [0.5, nan, -0.5, nan, nan, nan, nan, 0.01, 0.05, 0.05], ...
-                ["du_f", "cuMax", "dl_f", "clMin", "dt_f", "ctMax", "tMax", "tMin", "rle", "rle"]);
+            val_min = [0, 0.15, -1e-6, nan, 0.15, 0.03, 0, 0.005, 0.001, nan];
+            val_max = [nan, 0.65, nan, 1e-6, 0.65, 0.2, nan, nan, nan, 1e-3];
+            norm = [0.5, nan, nan, -0.5, nan, nan, 0.01, 0.05, 0.05, nan];
+            name = ["du_f", "cuMax", "dt_f", "dt_r", "ctMax", "tMax", "tMin", "rle", "rle", "du_f2"];
+
+            if nargin < 1 || isempty(id), id = 1:numel(val_min); end
+            
+            a = Violation(val_min(id), val_max(id), norm(id), name(id));
         end
         function base = baseline(base_name)
             
@@ -354,11 +433,6 @@ classdef Aerofoil < handle
             
             base = Aerofoil.getaerofoil(base_name);
             base.check;
-            
-%             a = violation([0, 0.15, nan, 0.1, 0, 0.15, 0.05, 0, 0.005, 0.005], ...
-%                 [nan, 0.65, 0, 0.65, nan, 0.65, 0.15, nan, nan, nan], [], ...
-%                 [0.5, nan, -0.5, nan, nan, nan, nan, 0.01, 0.05, 0.05], ...
-%                 ["du_f", "cuMax", "dl_f", "clMin", "dt_f", "ctMax", "tMax", "tMin", "rle", "rle"]);
         end
         function plotter(varargin)
             
@@ -373,8 +447,12 @@ classdef Aerofoil < handle
                     figure
                     hold on
                     title(sprintf('Aerofoil%i', k))
-                    plot(coords(:,j*2-1), coords(:,j*2));
+                    plot(coords(:,j*2-1), coords(:,j*2), 'k');
                     axis equal
+                    xlabel('x')
+                    ylabel('z')
+                    latexfigure()
+                    hold off
                     k = k + 1;
                 end
             end
