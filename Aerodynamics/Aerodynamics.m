@@ -258,7 +258,9 @@ classdef Aerodynamics
             
             if isa(part, 'Aerofoil')
                 
-                data = obj.get_data();
+                data = part.data;
+                unit_norm = data.unit_norm;
+                area = data.area;
             else
                 data = part.quad_data;
                 unit_norm = data.norm./data.mag;

@@ -6,7 +6,7 @@ nOpt = var_obj.nOpt;
 % Number of designs to test for geometric violation design of experiment
 nDes = 1000 * nOpt;
 % Number of designs to use for performance design of experiment 
-nTest = max(5 * nOpt, 80);
+nTest = min(5 * nOpt, 80);
 
 % Geometric DOE positions
 [~, var] = var_obj.init_lhs(nDes);
