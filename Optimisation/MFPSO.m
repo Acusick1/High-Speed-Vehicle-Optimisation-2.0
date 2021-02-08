@@ -66,7 +66,7 @@ classdef MFPSO < PSO
                         obj.hf_cost(end+1,:) = a.cost;
                         obj.hf_penalties(end+1,:) = hf_pen;
                         obj.data(end+1,:) = [a.cost - lf_cost, hf_pen - lf_pen(obj.mf_id)];
-                        obj.update_models();
+                        obj = obj.update_models();
                     end
                 end
                 
@@ -89,6 +89,8 @@ classdef MFPSO < PSO
                         'expected-improvement-plus',...
                         'UseParallel',1,'Verbose',0));
             end
+            
+            close all
         end
         function obj = main(obj)
             

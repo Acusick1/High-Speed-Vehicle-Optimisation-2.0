@@ -55,14 +55,14 @@ classdef PSO < GlobalOptimisation
                 [obj.cost, obj.penalty, obj.penalties] = obj.cost_fun(obj.variables);
             catch
                 obj.cost = obj.cost_fun(obj.variables);
-            end
-            
-            if isempty(obj.vio_fun)
                 
-                obj.penalties = zeros(obj.nPop, 1);
-            else
-                obj.penalties = max(0, obj.vio_fun(obj.variables));
-                obj.penalty = sum(obj.penalties, 2);
+                if isempty(obj.vio_fun)
+                
+                    obj.penalties = zeros(obj.nPop, 1);
+                else
+                    obj.penalties = max(0, obj.vio_fun(obj.variables));
+                    obj.penalty = sum(obj.penalties, 2);
+                end
             end
         end
         function obj = init_best(obj)
