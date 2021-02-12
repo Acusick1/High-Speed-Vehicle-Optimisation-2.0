@@ -5,12 +5,12 @@ attempt     = 1;
 anchor      = 0.1; % Alterations by 10%
 
 if sum(wing.span) > 1
-    % Renormalise so total wingspan < total body length
+    % Renormalise so total wingspan < below dimensionaliser
     wing.span = wing.span/sum(wing.span);
 end
 
 wing.chord  = wing.chord  .* body.length;
-wing.span   = wing.span   .* body.length;
+wing.span   = wing.span   .* 0.5 * (body.length + body.width/2);
 wing.offset = wing.offset .* [body.length, body.height];
 
 while cont
