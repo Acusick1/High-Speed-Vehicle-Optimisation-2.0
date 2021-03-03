@@ -10,6 +10,7 @@ classdef MFPSO < PSO
         hf_cost_fun
         hf_completed
         data
+        it_hf
     end
     
     methods
@@ -49,6 +50,8 @@ classdef MFPSO < PSO
                 a.(fn{i}) = obj.best.(fn{i})(best_id,:);
             end
             
+            
+            
             if isempty(obj.gBest) || a.cost < obj.gBest.cost
                 
                 % Has to be run through hf cost function and rechecked
@@ -75,6 +78,10 @@ classdef MFPSO < PSO
                     
                     obj.gBest = a;
                 end
+                
+                obj.it_hf = 0;
+            else
+                obj.it_hf = obj.it_hf + 1;
             end
         end
         function obj = update_models(obj)
@@ -101,7 +108,7 @@ classdef MFPSO < PSO
             
             hood = obj.single_link_neighbour(obj.nPop, 4);
             
-            obj = obj.update_cost();
+            obj = obj.update_cost(0);
             obj = obj.adjust_cost();
             obj = obj.init_best();
             obj = obj.update_gBest();
@@ -133,14 +140,14 @@ classdef MFPSO < PSO
                 obj.variables(sets(:,3), :) =...
                     obj.nonuni_mutation(obj.variables(sets(:,3), :), i);
                 
-                obj = obj.update_cost();
+                obj = obj.update_cost(i-1);
                 obj = obj.adjust_cost();
                 obj = obj.update_best(obj.con_tol(i));
                 obj = obj.update_gBest();
                 
                 obj.hist(i,:) = obj.gBest;
                 
-                if any(i-1 == obj.save_it), obj.save_opt(i); end
+                if any(i-1 == obj.save_it), obj.save_opt(i-1); end
                 
                 if isequaln(obj.hist(i), obj.hist(i-1))
                     

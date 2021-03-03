@@ -33,10 +33,10 @@ classdef Aerodynamics
         
     end
     
-    properties (Constant)
+    properties %(Constant)
         
         impact_method = struct(...
-            'newtonian', ["nose", "default"], ...
+            'newtonian', ["nose", "default", "foil"], ...
             'tangentobs', ["foil", "tail", "wing", "wedge"], ...
             'tangentcone', ["body", "fuse"], ...
             'obspm', ["cone"]);
@@ -330,28 +330,32 @@ classdef Aerodynamics
             obj.shadow = sh;
 
             obj = obj.method_switcher(obj.impact_method, im);
-            obj = obj.method_switcher(obj.shadow_method, sh);
             
             % Machq essentially a placeholder
             % Replaced with interpolation from Mach = 0 normal to flow, to
             % first panel that does not use newtonian
             for i = 1:dim(2)
                 
-                int = obj.Medge(:,i) == f.Machq;
+                int = obj.Medge(:,i) == f.Machq | isnan(obj.Medge(:,i));
                 a = find(~int, 1);
                 %% TODO: what if purely newtonian?
-                if isempty(a), continue; end
-                    
                 x0 = obj.del(a, i);
+                y0 = obj.Medge(a, i);
+                
+                if isempty(a) || y0 <= 0    
+                    x0 = 0;
+                    y0 = obj.flow.Minf;
+                end
+              
                 x1 = pi/2;
                 xq = obj.del(int, i);
-                
-                y0 = obj.Medge(a, i);
                 y1 = 0;
                 
                 obj.Medge(int, i) = y0 + (xq - x0).*((y1 - y0)./(x1 - x0));
             end
-                
+            
+            obj = obj.method_switcher(obj.shadow_method, sh);
+            
             obj.part = part;
             
             if ~isempty(obj.visc)
@@ -439,24 +443,25 @@ classdef Aerodynamics
             denom = g * (Mn1.^2) - (g - 1)/2;
             
             Mn2 = (numer./denom).^0.5;
-            % Anderson2006 p38
-            Pratio = 1 + ((2 * g)/(g + 1)) * ((Mn1.^2) - 1);
+
+            % Anderson2006 p43
+            K = Minf * theta;
+            Pratio = 1 + (((g * (g + 1))/4) * K.^2) + (g * K.^2 .* (((g + 1)/4).^2 + (1./(K.^2))).^0.5);
             rratio = ((g + 1) * (Mn1.^2))./(2 + (g - 1) * (Mn1.^2));
             
             M2 = Mn2./(sin(beta - theta));
             
             obj.Medge(con) = M2;
-            % Assumed equation (Isentropic < flow is not)
-            obj.Cp(con) = (1/(0.5 * g * (Minf^2))) * (Pratio - 1);
+            % Anderson2006 p47
             % M1 = Minf as tangent assumes series of impinging shockwaves
-            obj.Cp(con) = 4/(g + 1) * (sin(beta).^2) - 1./(Minf.^2);
+            obj.Cp(con) = (1/(0.5 * g * (Minf^2))) * (Pratio - 1);
             obj.Pedge(con) = Pratio * Pinf;
             obj.rho(con) = rratio * f.rinf;
             % Eq of state
             obj.Tedge(con) = (Pratio./rratio) * f.Tinf;
         end
         function obj = tangentcone(obj, con)
-            
+
             theta = obj.del(con);
             M1 = obj.flow.Minf;
             g = obj.flow.gamma;
@@ -484,14 +489,14 @@ classdef Aerodynamics
             
             Mn1 = M1 * sin(tau);
             
-            %% TODO: Where is this from?
-            Pratio = (2 * g * Mn1.^2 - (g - 1))/(g + 1);
+            K = M1 * theta;
+            Pratio = 1 + (((g * (g + 1))/4) * K.^2) + (g * K.^2 .* (((g + 1)/4).^2 + (1./(K.^2))).^0.5);
             %% TODO: Same as tangent-wedge?
             % Anderson2006 p38
             rratio = ((g + 1) * (Mn1.^2))./(2 + (g - 1) * (Mn1.^2));
             
             obj.Medge(con) = M;
-            obj.Cp(con) = (theta.^2) .* (1 + (frac1 .* log(frac2)));
+            obj.Cp(con) = sin(theta.^2) .* (1 + (frac1 .* log(frac2)));
             obj.Pedge(con) = Pratio * obj.flow.Pinf;
             obj.rho(con) = rratio * obj.flow.rinf;
             % Eq of state

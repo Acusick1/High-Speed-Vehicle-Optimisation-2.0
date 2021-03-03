@@ -65,7 +65,11 @@ classdef Optimisation
         end
         function save_opt(obj, it)
             
-            save(fullfile(obj.save_dir, sprintf('it%i', it-1)));
+            if isempty(obj.save_dir), obj.save_dir = pwd; end
+            
+            % Save opt object and current rng state
+            rngState = rng();
+            save(fullfile(obj.save_dir, sprintf('it%i', it)), 'obj', 'rngState');
         end
     end
     

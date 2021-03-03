@@ -134,10 +134,12 @@ classdef BezierFoil < Aerofoil & Bezier
                 
                 zlMin = [-edgeVar/2, repmat(-zMean - zVar, 1, nFree), 0]';
                 zlMax = [edgeVar/2, repmat(-zMean + zVar, 1, nFree), 0]';
+                zlMax = min(zlMax, 0);
                 
                 zuMin = [-edgeVar/2, repmat(zMean - zVar, 1, nFree), 0]';
                 zuMax = [edgeVar/2, repmat(zMean + zVar, 1, nFree), 0]';
-            
+                zuMin = max(zuMin, 0);
+                
                 var_min = [xMin, zuMin, xMin, zlMin];
                 var_max = [xMax, zuMax, xMax, zlMax];
                 

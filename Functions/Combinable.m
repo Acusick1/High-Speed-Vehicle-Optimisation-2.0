@@ -45,4 +45,35 @@ classdef Combinable
             end
         end
     end
+    
+    methods (Static)
+        
+        function obj = hori(varargin)
+                        
+            objarray = [varargin{:}];
+            
+            fn = fieldnames(objarray(1), '-full');
+            
+            obj = objarray(1);
+            
+            for i = 1:numel(fn)
+                
+                try
+                    obj.(fn{i}) = [objarray.(fn{i})];
+                catch
+                end
+            end
+        end
+        function obj = vert(varargin)
+            
+            for i = 1:nargin
+                
+                varargin{i} = structfun(@transpose, varargin{i}, 'UniformOutput', false);
+            end
+            
+            obj = Combinable.hori(varargin{:});
+            
+            obj = structfun(@transpose, obj, 'UniformOutput', false);
+        end
+    end
 end

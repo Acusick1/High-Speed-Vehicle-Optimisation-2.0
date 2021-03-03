@@ -108,7 +108,7 @@ classdef Population < Design
                 
                 for i = nPop:-1:1
                         
-                    if ~feasible(i), continue; end
+                    if ~feasible(i) || any(isinf(fit(i,:))), continue; end
                     
                     contender = fit(i,:);
                                         
@@ -133,6 +133,7 @@ classdef Population < Design
                 nondom_ID(con) = [];
                 pars_dominated(con) = [];
             else
+                pen(any(~isfinite(fit), 2)) = inf;
                 pen(isnan(pen)) = 0;
                 [~, nondom_ID] = min(sum(pen, 2));
                 nondom_fit = fit(nondom_ID, :);

@@ -1,26 +1,76 @@
-function [wing, lbody, ubody] = vec_wingbody(wing, body)
+function [wing, lbody, ubody, extWing] = vec_wingbody(wing, body)
+
+% Removing body boundary from interpolant so that wing cannot alter it
+bx = body.x(2:end-1, 2:end-1);
+by = body.y(2:end-1, 2:end-1);
+bz = body.z(2:end-1, 2:end-1);
+
+Fy = scatteredInterpolant(bx(:), bz(:), by(:));
+Fy.ExtrapolationMethod = 'none';
 
 cont        = true;
 attempt     = 1;
 anchor      = 0.1; % Alterations by 10%
+
+withinLength = wing.chord(1) + wing.offset(1);
+
+if withinLength > 1
+
+    wing.chord(1) = wing.chord(1)/withinLength;
+    wing.offset(1) = wing.offset(1)/withinLength;
+end
 
 if sum(wing.span) > 1
     % Renormalise so total wingspan < below dimensionaliser
     wing.span = wing.span/sum(wing.span);
 end
 
+maxSpan = 0.5 * body.length;
+
 wing.chord  = wing.chord  .* body.length;
-wing.span   = wing.span   .* 0.5 * (body.length + body.width/2);
-wing.offset = wing.offset .* [body.length, body.height];
+% Body width halved again to give symmetry axis width
+wing.span   = wing.span .* maxSpan;
+wing.offset(1) = wing.offset(1) .* body.length;
+
+% Ratio defining minimum local width wing can be placed at
+yMinOffsetRatio = 0.3;
+
+zOffset = get_zOffsets(body, wing.offset(1));
+yOffset = Fy(repmat(wing.offset(1), size(zOffset)), zOffset);
+offCount = find(yOffset > yMinOffsetRatio * max(yOffset), 1);
+
+wing.offset(2) = zOffset(offCount);
+quit = false;
 
 while cont
     
+    midDiff = body.length/2 - (wing.offset(1) + wing.chord(1)/2);
+    if midDiff > 0 && attempt < 20
+        
+    	wing.offset(1) = wing.offset(1) + midDiff;
+        zOffset = get_zOffsets(body, wing.offset(1));
+        yOffset = Fy(repmat(wing.offset(1), size(zOffset)), zOffset);
+        
+        offCount = find(yOffset > yMinOffsetRatio * max(yOffset), 1);
+    end
+    
     wing = wing.dogenerate();
+        
+    extWing = wing;
+    extWing.y = extWing.y + yOffset(offCount);
+    % Geometry.plotter(body, temp)
+    extWing = extWing.extendWithin();
     
-    [ujoint, usurf_id, uline_id, uexit] = linesurface(wing.upper, body);
-    [ljoint, lsurf_id, lline_id, lexit] = linesurface(wing.lower, body);
+    [ujoint, ~, uline_id, uexit] = linesurface(extWing.upper, body);
+    [ljoint, ~, lline_id, lexit] = linesurface(extWing.lower, body);
     
-    exit = [uexit, lexit];
+    exit = unique([uexit, lexit]);
+    % Prioritise zOffset first, then deal with x
+    prioritise = any(exit == [3, 4]', 1);
+    if any(prioritise)
+        
+        exit(~prioritise) = [];
+    end
     
     if any(exit)
         
@@ -29,25 +79,69 @@ while cont
         if any(exit == 1)
             
             wing.offset(1) = wing.offset(1) * (1 + anchor);
+            zOffset = get_zOffsets(body, wing.offset(1));
+            yOffset = Fy(repmat(wing.offset(1), size(zOffset)), zOffset);
+            
+            offCount = find(yOffset > yMinOffsetRatio * max(yOffset), 1);
         end
         
-        zOut = [any(exit == 3), any(exit == 4)];
-        
-        if sum(zOut) == 1
+        if any(exit == 3)
             
+            if offCount < numel(zOffset)
+                
+                offCount = offCount + 1;
+                wing.offset(2) = zOffset(offCount);
+            
+%             elseif wing.dihedral(1) > deg2rad(20)
+%                 
+%                 wing.dihedral(1) = wing.dihedral(1) - deg2rad(5);
+            else
+                wing.chord(1) = wing.chord(1) * (1 - anchor);
+            end
             % Will tend towards midline
-            wing.offset(2) = wing.offset(2) * (1 - anchor);
+            % wing.offset(2) = wing.offset(2) * (1 - anchor);
         end
         
-        if any(exit == 2) || all(zOut) || attempt > 10
+        % Wing should never be above body since its placed below mid-height
+        % So if exit == 4, treat same as chord beyond body
+        if any(exit == 2) || any(exit == 4) %||attempt > 10
             
-            wing.chord(1) = wing.chord(1) * (1 - anchor);
+            if wing.lead_sweep(1) < 0
+                
+                wing.trail_sweep(1) = wing.trail_sweep(1) * (1 - anchor);
+            
+            elseif wing.chord(1) > 0.5 * body.length || midDiff > 0 || all(any(exit' == [3, 4]))
+                
+                wing.chord(1) = wing.chord(1) * (1 - anchor);
+            else
+                wing.offset(1) = wing.offset(1) * (1 - anchor);
+                zOffset = get_zOffsets(body, wing.offset(1));
+                yOffset = Fy(repmat(wing.offset(1), size(zOffset)), zOffset);
+                
+                offCount = find(yOffset > yMinOffsetRatio * max(yOffset), 1);
+            end
+        end
+        
+        if any(exit == 5)
+            
+            wing.span(1) = wing.span(1) * (1 + anchor);
+            
+            if sum(wing.span) > maxSpan
+                
+                quit = true;
+            end
         end
         
         attempt = attempt + 1;
         
-        if wing.chord(1) < 0.1 * body.length
-            % geometry.plotter(body, wing)
+        if mod(attempt, 500) == 0
+            
+            quit = true;
+            % error('%s failed, cannot merge components', mfilename) 
+        end
+        
+        if wing.chord(1) < 0.1 * body.length || quit
+            % Geometry.plotter(body, wing)
             wing = [];
             % Only needed if handle
             % lbody = copy(body);
@@ -63,6 +157,7 @@ end
 %% Redefine wing
 % Only needed if handle
 % wing = copy(wing);
+wing = extWing;
 
 x = wing.x;
 y = wing.y;
@@ -131,136 +226,155 @@ x = body.x(:,1);
 y = body.y;
 z = body.z;
 
+% Only keep body points outwith wing chord
+% Merge body, wing points and interpolate to find new discretisation
+% Cannot use sort here, sometimes joint will not be monotonically
+% increasing in x
+% xunew = [x(x < min(wing.x(:,1))); wing.x(:,1); x(x > max(wing.x(:,1)))];
+% xlnew = [x(x < min(wing.x(:,end))); wing.x(:,end); x(x > max(wing.x(:,end)))];
+xunew = [x(x < wing.x(1,1)); wing.x(:,1); x(x > wing.x(end,1))];
+xlnew = [x(x < wing.x(1,end)); wing.x(:,end); x(x > wing.x(end,end))];
+yunew = interp1(x, y, xunew);
+zunew = interp1(x, z, xunew);
+ylnew = interp1(x, y, xlnew);
+zlnew = interp1(x, z, xlnew);
+
 %% UPPER AND LOWER
-f_split_id = usurf_id(1, 2);
-b_split_id = usurf_id(end, 2);
+%% Leading edge (upper and lower)
+le_id = find(wing.x(1,1) == xunew, 1);
 
-% Last panel upper joint interferes with (radially)
-uradbound = min(max(usurf_id(:,2)), size(usurf_id, 1) - 1);
-% First panel lower joint interferes with
-lradbound = max(min(lsurf_id(:,2), 2));
+lastAbove = find(zunew(le_id,:) - wing.z(1,1) < 0, 1) - 1;
+lastAbove = max(min(lastAbove, size(zunew, 2) - 1), 1);
+ids = [0 1] + lastAbove;
 
-xu_int = ujoint(:,1);
-xl_int = ljoint(:,1);
+yz_le = [wing.y(1), wing.z(1)];
 
-% Including one extra point for interpolation below
-yu_int = interp1(x(:,1), y(:, 1:uradbound+1), xu_int);
-zu_int = interp1(x(:,1), z(:, 1:uradbound+1), xu_int);
-yl_int = interp1(x(:,1), y(:, lradbound-1:end), xl_int);
-zl_int = interp1(x(:,1), z(:, lradbound-1:end), xl_int);
-
-yz_le = ujoint(1, [2 3]);
-yzu_te = ujoint(end, [2 3]);
-yzl_te = ljoint(end, [2 3]);
-
-ids = [0 1] + f_split_id;
-
-%% Leading edge line
-% Same for upper and lower
-line = [yu_int(1, ids); zu_int(1, ids)]';
+line = [yunew(le_id, ids); zunew(le_id, ids)]';
 t = positionOnLine(line(1,:), line(2,:), yz_le);
 
-y_le = sum([1-t t] .* y(:, ids), 2);
-z_le = sum([1-t t] .* z(:, ids), 2);
+y_le = sum([1-t t] .* yunew(:, ids), 2);
+z_le = sum([1-t t] .* zunew(:, ids), 2);
 
-%% Trailing edge line
-% Can be different
+yu_le = y_le(1:le_id-1);
+zu_le = z_le(1:le_id-1);
 
-ids = [0 1] + b_split_id;
+%% Leading edge (lower)
+le_id = find(wing.x(1,end) == xlnew, 1);
 
-line = [yu_int(end, ids); zu_int(end, ids)]';
-t = positionOnLine(line(1,:), line(2,:), ujoint(end, [2 3]));
+lastAbove = find(zlnew(le_id,:) - wing.z(1,1) < 0, 1) - 1;
+lastAbove = max(min(lastAbove, size(zlnew, 2) - 1), 1);
+ids = [0 1] + lastAbove;
 
-yu_te = sum([1-t t] .* y(:, ids), 2);
-zu_te = sum([1-t t] .* z(:, ids), 2);
+yz_le = [wing.y(1), wing.z(1)];
 
-if isequal(yzu_te, yzl_te)
-    
-    yl_te = yu_te;
-    zl_te = zu_te;
-else
-    line = [yl_int(end, [1 2]); zl_int(end, [1 2])]';
-    t = positionOnLine(line(1,:), line(2,:), ljoint(end, [2 3]));
-    
-    yl_te = sum([1-t t] .* y(:, ids), 2);
-    zl_te = sum([1-t t] .* z(:, ids), 2);
-end
+line = [ylnew(le_id, ids); zlnew(le_id, ids)]';
+t = positionOnLine(line(1,:), line(2,:), yz_le);
 
-xuedges = [min(xu_int), max(xu_int)];
-xledges = [min(xl_int), max(xl_int)];
+y_le = sum([1-t t] .* ylnew(:, ids), 2);
+z_le = sum([1-t t] .* zlnew(:, ids), 2);
 
-le = [x y_le z_le];
-u_te = [x yu_te zu_te];
-l_te = [x yl_te zl_te];
+yl_le = y_le(1:le_id-1);
+zl_le = z_le(1:le_id-1);
 
-ujoint = [le(le(:,1) < xuedges(1), :);
-    ujoint;
-    u_te(u_te(:,1) > xuedges(2), :)];
+%% Trailing edge (upper)
+te_id = find(wing.x(end, 1) == xunew, 1, 'last');
 
-ljoint = [le(le(:,1) < xledges(1), :);
-    ljoint;
-    l_te(l_te(:,1) > xledges(2), :)];
+lastAbove = find(zunew(te_id,:) - wing.z(end, 1) < 0, 1) - 1;
+lastAbove = max(min(lastAbove, size(zunew, 2) - 1), 1);
+ids = [0 1] + lastAbove;
 
-con = x < xuedges(1) | x > xuedges(2);
-xu = [x(con, :); xu_int];
-yu = [y(con, 1:uradbound+1); yu_int];
-zu = [z(con, 1:uradbound+1); zu_int];
+yz_te = [wing.y(end, 1), wing.z(end, 1)];
 
-con = x < xledges(1) | x > xledges(2);
-xl = [x(con, :); xl_int];
-yl = [y(con, lradbound-1:end); yl_int];
-zl = [z(con, lradbound-1:end); zl_int];
+line = [yunew(te_id, ids); zunew(te_id, ids)]';
+t = positionOnLine(line(1,:), line(2,:), yz_te);
 
-[xu, idu] = sort(xu);
-[xl, idl] = sort(xl);
+yu_te = sum([1-t t] .* yunew(:, ids), 2);
+zu_te = sum([1-t t] .* zunew(:, ids), 2);
 
-yu = yu(idu,:);
-zu = zu(idu,:);
-yl = yl(idl,:);
-zl = zl(idl,:);
+yu_te = yu_te(te_id+1:end);
+zu_te = zu_te(te_id+1:end);
 
-rad = abs(atan2d(yu, zu));
-rad_joint = abs(atan2d(ujoint(:,2), ujoint(:,3)));
-[~, udim] = size(rad);
+%% Trailing edge (lower)
+te_id = find(wing.x(end, end) == xlnew, 1, 'last');
+
+lastAbove = find(zlnew(te_id,:) - wing.z(end, end) < 0, 1) - 1;
+lastAbove = max(min(lastAbove, size(zlnew, 2) - 1), 1);
+ids = [0 1] + lastAbove;
+
+yz_te = [wing.y(end, end), wing.z(end, end)];
+
+line = [ylnew(te_id, ids); zlnew(te_id, ids)]';
+t = positionOnLine(line(1,:), line(2,:), yz_te);
+
+yl_te = sum([1-t t] .* ylnew(:, ids), 2);
+zl_te = sum([1-t t] .* zlnew(:, ids), 2);
+
+yl_te = yl_te(te_id+1:end);
+zl_te = zl_te(te_id+1:end);
+
+yuJoint = [yu_le; wing.y(:,1); yu_te];
+zuJoint = [zu_le; wing.z(:,1); zu_te];
+
+ylJoint = [yl_le; wing.y(:,end); yl_te];
+zlJoint = [zl_le; wing.z(:,end); zl_te];
+
+rad = abs(atan2d(yunew, zunew));
+rad_joint = abs(atan2d(yuJoint, zuJoint));
+
+%% Upper and lower seperately defined by orginal body points and joints
+% 2:end-1 to exclude collapsing edges (0 degrees)
+udim = find(min(rad(2:end-1,:)) - max(rad_joint(2:end-1)) > 0, 1) - 1;
+
+yub = yunew(:,1:udim);
+zub = zunew(:,1:udim);
+rad = rad(:,1:udim);
 
 for i = 1:udim
     
     replace = rad(:,i) > rad_joint;
-    yu(replace, i) = ujoint(replace, 2);
-    zu(replace, i) = ujoint(replace, 3);
+    yub(replace, i) = yuJoint(replace);
+    zub(replace, i) = zuJoint(replace);
 end
 
-rad = abs(atan2d(yl, zl));
-rad_joint = abs(atan2d(ljoint(:,2), ljoint(:,3)));
-[~, ldim] = size(rad);
+yub = [yub yuJoint];
+zub = [zub zuJoint];
 
-for i = 1:ldim
+rad = abs(atan2d(ylnew, zlnew));
+rad_joint = abs(atan2d(ylJoint, zlJoint));
+
+% Lower
+% 2:end-1 to exclude collapsing edges (0 degrees)
+ldim = find(max(rad(2:end-1,:)) - min(rad_joint(2:end-1)) > 0, 1);
+
+ylb = ylnew(:,ldim:end);
+zlb = zlnew(:,ldim:end);
+rad = rad(:,ldim:end);
+
+for i = 1:size(ylb, 2)
     
     replace = rad(:,i) < rad_joint;
-    yl(replace, i) = ljoint(replace, 2);
-    zl(replace, i) = ljoint(replace, 3);
+    ylb(replace, i) = ylJoint(replace);
+    zlb(replace, i) = zlJoint(replace);
 end
 
-% Replacing extra point with joint
-yu(:, end) = ujoint(:,2);
-zu(:, end) = ujoint(:,3);
-yl(:, 1) = ljoint(:,2);
-zl(:, 1) = ljoint(:,3);
+ylb = [ylJoint ylb];
+zlb = [zlJoint zlb];
+
 %% TODO: Only needed if handle
 % ubody = copy(body);
 % lbody = copy(body);
 ubody = body;
 lbody = body;
 
-ubody.x = repmat(xu, 1, udim);
-ubody.y = yu;
-ubody.z = zu;
+ubody.x = repmat(xunew, 1, size(yub, 2));
+ubody.y = yub;
+ubody.z = zub;
 
-lbody.x = repmat(xl, 1, ldim);
-lbody.y = yl;
-lbody.z = zl;
+lbody.x = repmat(xlnew, 1, size(ylb, 2));
+lbody.y = ylb;
+lbody.z = zlb;
 
-% geometry.plotter(lbody, ubody, wing)
+% Geometry.plotter(lbody, ubody, wing)
 
 % figure(gcf)
 % hold on
@@ -369,7 +483,18 @@ for i = [nLines, 1:nLines-1]
     surf_id(i,:) = [j k];
     
     exit = exitcode(joint(i,:), j, k);
-    if any(exit), return; end
+    if any(exit)
+        
+        return
+    end
+end
+
+% Last resort to say increase span, would be better to have condition
+% triggering this within exitcode
+if any(isnan(joint(:,1)))
+    
+    exit = 5;
+    return
 end
 
 seg_id = c;
@@ -405,9 +530,22 @@ seg_id = c;
                 
                 if any(onLine)
                     
-                    onLine = find(onLine, 1);
+                    % If more than one, pick one with largest y
+                    if sum(onLine) > 1
+                        
+                        onLine = I_in(:,2) == max(I_in(:,2));
+                        
+                        % Still get more than one point if intersection
+                        % lies on panel line
+                        if sum(onLine) > 1
+                            
+                            del = find(onLine);
+                            onLine(del(2:end):end) = 0;
+                        end
+                    end
                     
                     joint = I_in(onLine, :);
+                    
                     id = ids(onLine);
                     
                     if mod(id, 2)
@@ -456,17 +594,17 @@ seg_id = c;
             if any(flag(i,:))
                 
                 exit = flag(i,:);
-            else
-                exit = 5;
+%             else
+%                 exit = 5;
             end
         else
-            con = [j == [1 s1] k == [1 s2]];
-            
-            if any(con)
-                
-                arr = 1:numel(con);
-                exit = arr(con);
-            end
+%             con = [j == [1 s1] k == [1 s2]];
+%             
+%             if any(con)
+%                 
+%                 arr = 1:numel(con);
+%                 exit = arr(con);
+%             end
         end
     end
 end
@@ -506,4 +644,13 @@ d = sum(diff(longline).^2).^0.5;
 dt = sum(diff(shortline).^2).^0.5;
 
 t = dt/d;
+end
+
+function offsets = get_zOffsets(body, xOffset)
+
+offsetsNd = 0.1:0.05:0.9;
+
+id = find(body.x(:,1) - xOffset > 0, 1) - 1;
+zint = twoPointInterp(body.x(id:id+1,:)', body.z(id:id+1,:)', xOffset);
+offsets = twoPointInterp([0 1], [min(zint) max(zint)], offsetsNd);
 end

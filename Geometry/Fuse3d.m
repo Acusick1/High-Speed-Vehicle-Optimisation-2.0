@@ -26,8 +26,8 @@ classdef Fuse3d < Body
                 
                 obj.length = length;
                 % Halved as defining half width and upper/lower 
-                obj.w = w * length * 0.5;
-                obj.h = h * length * 0.5;
+                obj.w = w * length/2;
+                obj.h = h * length/2;
                 obj.nc = nc;
                 obj.nd = nd;
                 obj.Acu = Acu;
@@ -72,26 +72,26 @@ classdef Fuse3d < Body
         function obj = set.Acu(obj, in)
             %% TODO: Yay or nae (Change to inc_array fun anyway)
             % Can only be slightly below previous
-%             for i = 2:numel(in)
-%                 
-%                 if in(i) < in(i-1)*0.9
-%                     
-%                     in(i) = in(i-1)*0.9;
-%                 end
-%             end
+            for i = 2:numel(in)
+                
+                if in(i) < in(i-1)*0.9
+                    
+                    in(i) = in(i-1)*0.9;
+                end
+            end
             
             obj.Acu = in; 
         end
         function obj = set.Acl(obj, in)
             
             % Can only be slightly above previous
-%             for i = 2:numel(in)
-%                 
-%                 if in(i) > in(i-1) + 0.1
-%                     
-%                     in(i) = in(i-1) + 0.1;
-%                 end
-%             end
+            for i = 2:numel(in)
+                
+                if in(i) > in(i-1) + 0.1
+                    
+                    in(i) = in(i-1) + 0.1;
+                end
+            end
             
             obj.Acl = in; 
         end
@@ -210,19 +210,19 @@ classdef Fuse3d < Body
         end
         function [init_obj, a] = define()
 
-            a(1) = struct('name', "length", 'min', 1, 'max', 20);
-            % Stretch factors
-            a(2) = struct('name', "w", 'min', 0.1, 'max', 1);
-            a(3) = struct('name', "h", 'min', [0.1 0.1], 'max', [1 1]);
-            % Soanwise upper/lower curvature: 0 = tall/box, 1 = flat/sharp
-            a(4) = struct('name', "nc", 'min', [0.05 0.05], 'max', [1 1]);
-            % Streamwise nose/tail curvature: 0 = flat, 1 = knife
-            a(5) = struct('name', "nd", 'min', [0.25 1e-3], 'max', [1 1]);
+            a(1) = struct('name', "length", 'min', 10, 'max', 40);
+            % Stretch factors (% of length)
+            a(2) = struct('name', "w", 'min', 0.1, 'max', 0.8);
+            a(3) = struct('name', "h", 'min', [0.1 0.1], 'max', [0.8 0.8]);
+            % Spanwise upper/lower curvature: 0 = tall/box, 1 = cylindrical
+            a(4) = struct('name', "nc", 'min', [0.1 0.025], 'max', [1 1]);
+            % Streamwise nose/tail curvature: 0 = flat/box, 1 = knife
+            a(5) = struct('name', "nd", 'min', [0.25 1e-3], 'max', [0.95 0.8]);
             %% TODO: linear Ac1 > Ac2 rather than fuse height constraint
             a(6) = struct('name', "Acu", 'min', [0.05 0.05], 'max', [1 1]);
             a(7) = struct('name', "Acl", 'min', -[1 1], 'max', -[0.02 0.02]);
             % Have to be > 0 otherwise all(z) == 0
-            a(8) = struct('name', "Ad", 'min', [1e-3 1e-3 1e-3 1e-3], 'max', [1 1 1 1]);            
+            a(8) = struct('name', "Ad", 'min', [0.3 0.3 0.3 0.3], 'max', [1 1 1 1]);            
             
             init_obj = Fuse3d();
             [init_obj, a] = Geometry.define(init_obj, a);

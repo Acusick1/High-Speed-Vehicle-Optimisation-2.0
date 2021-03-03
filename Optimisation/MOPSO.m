@@ -14,7 +14,7 @@ classdef MOPSO < PSO
             
             sets = obj.subset(3);
 
-            obj = obj.update_cost();
+            obj = obj.update_cost(0);
             obj = obj.constraint_tolerance();
             
             e = obj.con_tol(1,:);
@@ -33,11 +33,9 @@ classdef MOPSO < PSO
             obj.hist = obj.gBest;
             
             fn = fieldnames(obj.gBest);
-            con = 1:length(best_id);
-            
             for j = 1:length(fn)
                 
-                obj.hist(1).(fn{j})(con,:) = obj.gBest.(fn{j})(con,:);
+                obj.hist(1).(fn{j}) = obj.PF.(fn{j})(best_id,:);
             end
             
             if ~isempty(obj.save_it)
@@ -56,7 +54,7 @@ classdef MOPSO < PSO
                 obj.variables(sets(:,3), :) =...
                     obj.nonuni_mutation(obj.variables(sets(:,3), :), i-1);
                 
-                obj = obj.update_cost();
+                obj = obj.update_cost(i-1);
                 
                 e = obj.con_tol(i,:);
                 obj = obj.update_PF(e);
@@ -72,7 +70,7 @@ classdef MOPSO < PSO
                 
                 for j = 1:length(fn)
                     
-                    obj.hist(i,:).(fn{j})(con,:) = obj.gBest.(fn{j})(con,:);
+                    obj.hist(i,:).(fn{j}) = obj.PF.(fn{j})(best_id,:);
                 end
                 
                 time = toc;
@@ -87,19 +85,36 @@ classdef MOPSO < PSO
                 
                 if any(i-1 == obj.save_it)
                     
-                    obj.save_opt(i);
+                    obj.save_opt(i-1);
                     %% Attempt to reset parpool to avoid OOM errors
-                    if ~isempty(gcp('nocreate')), delete(gcp); end
+                    if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
+                        
+                        delete(gcp); 
+                    end
                 end
             end
         end
-        function obj = main_loop(obj, sets, fn, i)
+        function obj = main_loop(obj, it1, nIter, rngState)
             
-            if nargin < 4 || isempty(i), i = 2; end
+            if nargin < 2 || isempty(it1), it1 = 2; end
+            if nargin >= 3 && ~isempty(nIter)
+                
+                % If extending simulation, set constraint tolerance to
+                % original final value
+                obj.maxIt = nIter;
+                obj.con_tol(end:nIter+1) = obj.con_tol(end);
+            end
+            if nargin >= 4 && ~isempty(rngState)
+                
+                rng(rngState);
+            end
+            
+            fn = fieldnames(obj.gBest);
+            sets = obj.subset(3);
             
             str = repmat('%4.3f ', 1, obj.nFun);
             
-            for i = i:obj.maxIt + 1
+            for i = it1:obj.maxIt + 1
                 
                 tic
                 obj = obj.update_position();
@@ -110,12 +125,15 @@ classdef MOPSO < PSO
                 obj.variables(sets(:,3), :) =...
                     obj.nonuni_mutation(obj.variables(sets(:,3), :), i-1);
                 
-                obj = obj.update_cost();
+                obj = obj.update_cost(i-1);
                 
-                e = obj.con_tol(i);
+                e = obj.con_tol(i,:);
                 obj = obj.update_PF(e);
                 
+                % distance = Population.crowding(obj.PF.cost);
+                % distance = distancecrowding([],obj.PF.cost);
                 best_id(1) = obj.roulette(obj.PF.nDom);
+                % best_id(2) = obj.roulette(distance, true);
                 best_id(2) = obj.roulette(obj.PF.nDom, true);
                 
                 obj = obj.update_best(e);
@@ -123,23 +141,27 @@ classdef MOPSO < PSO
                 
                 for j = 1:length(fn)
                     
-                    obj.hist(i,:).(fn{j}) = obj.gBest.(fn{j});
+                    obj.hist(i,:).(fn{j}) = obj.PF.(fn{j})(best_id,:);
                 end
                 
                 time = toc;
+                
                 pf_pen = obj.PF.penalty;
                 pf_pen(isnan(pf_pen)) = 0;
                 
                 if obj.verbose
-                 
+                    
                     fprintf(['Iteration %i: Mean PF f(x): ' str ' p(x): %4.2f e: %4.2f nPF: %i Success rate: %i t(it): %4.2f\n'], i-1, mean(obj.PF.cost, 1), mean(pf_pen(:)), mean(obj.con_tol(i-1,:)), size(obj.PF.cost, 1), sum(all(isfinite(obj.cost), 2))/obj.nPop*100, time);
                 end
                 
                 if any(i-1 == obj.save_it)
                     
-                    obj.save_opt(i);
+                    obj.save_opt(i-1);
                     %% Attempt to reset parpool to avoid OOM errors
-                    delete(gcp)
+                    if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
+                        
+                        delete(gcp); 
+                    end
                 end
             end
         end
@@ -232,15 +254,35 @@ classdef MOPSO < PSO
     
     methods (Static)
         
-        function obj = restart(opt_file)
+        function obj = restart(opt_dir, maxIt)
             %% TODO: Opt_file should be opt folder, otherwise Init overwritten
             %% TODO: Put i into obj, take from there
-            load('Init', 'sets', 'fn')
-            load(opt_file, 'obj')
-            i = regexp(find_file('it'), '\d*', 'Match');
-            i = str2double(i{end}) + 1;
+            % load(fullfile(opt_dir, 'Init'), 'sets', 'fn')
+            checkpoints = dir(fullfile(opt_dir, 'it*'));
+
+            for i = numel(checkpoints):-1:1
             
-            obj = obj.main_loop(sets, fn, i);
+                temp = regexp(checkpoints(i).name, '\d*', 'Match');
+                it(i) = str2double(temp{:});
+            end
+            
+            % Plus 1 as PSO loop starts at 2
+            % Could be plus 2 to start from next it, but repeating last it
+            % incase error occured
+            [it, id] = max(it+1);
+            load(fullfile(checkpoints(id).folder, checkpoints(id).name), 'obj')
+            
+            try
+                load(fullfile(checkpoints(id).folder, checkpoints(id).name), 'rngState')
+                rng(rngState);
+            catch
+                rngState = [];
+            end
+            
+            if nargin < 2, maxIt = []; end
+            
+            obj.save_dir = opt_dir;
+            obj = obj.main_loop(it, maxIt, rngState);
         end
     end
 end

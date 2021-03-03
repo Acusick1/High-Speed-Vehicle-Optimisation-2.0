@@ -50,7 +50,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
         end
         function obj = generate(obj, inputMetaProp, varargin)
             
-            if isempty(obj.(inputMetaProp.Name)) || obj.update
+            if obj.update || isempty(obj.(inputMetaProp.Name))
                 
                 obj.update = false;
                 obj = obj.dogenerate();
@@ -261,7 +261,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             views = [-90 0; -45, 25];
             % Top and bottom
             % views = [90 90; 90, -90];
-            % views = views(1,:);
+            views = views(2,:);
             
             nviews = size(views, 1);
             figure(gcf)
@@ -373,14 +373,25 @@ classdef Geometry% < handle & matlab.mixin.Copyable
                 if ~isempty(varargin{i})
                     
                     obj = varargin{i};
-%                     plot3(obj.x, obj.y, obj.z, 'k')
-%                     plot3(obj.x', obj.y', obj.z', 'k')
+                    data = obj.quad_data;
+                    cx = data.centre(:,:,1);
+                    cy = data.centre(:,:,2);
+                    cz = data.centre(:,:,3);
+                    nx = data.unit_norm(:,:,1);
+                    ny = data.unit_norm(:,:,2);
+                    nz = data.unit_norm(:,:,3);
+                    plot3(cx + nx, cy + ny, cz + nz, 'rx')
                     h = surf(obj.x,obj.y,obj.z,'LineWidth',0.05);
                     set(h,'FaceColor',colour,'FaceLighting','flat');%'EdgeColor','none');
                 end
             end
+           
             view(0, 0)
-            axis equal
+            xlabel('x, m', 'Interpreter', 'latex')
+            ylabel('y, m', 'Interpreter', 'latex')
+            zlabel('z, m', 'Interpreter', 'latex')
+            plotFormat([], [], {'LineWidth', 0.5})
+            axis equal tight
             hold off
         end
     end

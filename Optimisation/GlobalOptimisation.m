@@ -99,15 +99,30 @@ classdef GlobalOptimisation < Optimisation
             t = obj.maxIt + 1;
             cons = obj.penalty;
             nCon = size(cons, 2);
+            midIt = ceil(obj.maxIt/2);
             
-            if nargin < 2 || isempty(tf), tf = ceil(obj.maxIt/2); end
+            if nargin < 2 || isempty(tf), tf = midIt; end
             if nargin < 3 || isempty(ef), ef = 0; end
             
-            cons(isinf(cons)) = 2 * max(cons(isfinite(cons)));
+            % Have to set as zero first, otherwise max will be Inf
+            set = isinf(cons);
+            cons(set) = 0;
+            
+            for j = 1:nCon
+                
+                cons(set(:,j), j) = 2 * max(cons(:,j));
+            end
+            
             e = zeros(t, 1) + ef;
             
             % Needs non-zero value to tend towards
-            if ef, tEnd = ef; else, tEnd = 1e-16; end
+            if ef
+                
+                tEnd = ef; 
+            else
+                tEnd = 1e-3;
+                tf = 0.75*tf;
+            end
             
             for j = nCon:-1:1
                 
@@ -116,13 +131,14 @@ classdef GlobalOptimisation < Optimisation
                 e(1, j) = 0.5*(mean(conj) + min(conj));
             end
             
-            for i = 1:tf
+            for i = 1:midIt
                     
-                if i < tf
-                    
+                if i > tf
                     % Linear
-                    % ei = e(1) + i * (ef - e(1))/tf;
+                    ei = interp1([tf midIt], [tEnd 0], i);
+                    %ei = ef + i * (0 - ef)/tf;
                     
+                else
                     % Both from: Constrained Optimization by ε Constrained Differential Evolution with Dynamic ε-Level Control
                     B = log(e(1,:)/tEnd)/tf;
                     ei = e(1,:) .* exp(-B * i);

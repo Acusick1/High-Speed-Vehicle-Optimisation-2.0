@@ -9,10 +9,13 @@ if nargin < 3
     vectors(:,:,1) = y1 .* z2 - z1 .* y2;
     vectors(:,:,2) = z1 .* x2 - x1 .* z2;
     vectors(:,:,3) = x1 .* y2 - y1 .* x2;
-
-    vectors = squeeze(vectors);
     
     %% TODO: Something more robust to ensure output if matched
+    if ~isequal(size(vectors), size(mat1))
+        
+        vectors = squeeze(vectors);
+    end
+    
     if ~isequal(size(vectors), size(mat1))
         
         vectors = vectors';

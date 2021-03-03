@@ -52,8 +52,10 @@ classdef Bezier% < handle
             %                   xb1m, zb1m, ... xbnm, xbnm]
             
             if isvector(val)
-                
+                obj.order = length(val)/4 - 1;
                 val = reshape(val, obj.order + 1, []);
+            else
+                obj.order = size(val, 1) - 1;
             end
             
             %% TODO: Constraint hacks as in properties
@@ -92,10 +94,6 @@ classdef Bezier% < handle
         function a = get.ycp(obj)
             
             a = obj.control_points(:,2:2:end);
-        end
-        function a = get.order(obj)
-            
-            a = size(obj.xcp, 1) - 1;
         end
         function a = get.curve(obj)
             

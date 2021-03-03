@@ -257,29 +257,14 @@ classdef Aerofoil% < handle
             grad_f2 = diff(grad_f)./((diff(x(1:ID-1)) + diff(x(2:ID)))/2);
             grad_r = grad(ID:length(grad));
             
-            if any(grad_f < 0)
-                
-                d_f = sum(grad_f(grad_f < 0));
-            else
-                d_f = min(grad_f);
-            end
+            d_f = min(grad_f);
+            d_r = max(grad_r);
             
-            if any(grad_f2 > 0)
-                
-                d_f2 = sum(grad_f2(grad_f2 > 0));
-            
-            elseif isempty(grad_f2)
+            if isempty(grad_f2)
                 
                 d_f2 = 0;
             else
                 d_f2 = max(grad_f2);
-            end
-            
-            if any(grad_r > 0)
-                
-                d_r = sum(grad_r(grad_r > 0));
-            else
-                d_r = max(grad_r);
             end
             
             if which == "lower", d_f = -d_f; d_r = -d_r; end
@@ -366,7 +351,13 @@ classdef Aerofoil% < handle
             
             hold on
             plot(obj.coords(:,1), obj.coords(:,2), lineSpec{nLines+1})
-            latexfigure()
+            axis equal tight
+            ylim([-0.2, 0.2])
+            grid on
+            xlabel('x/c', 'Interpreter', 'latex')
+            ylabel('z/c', 'Interpreter', 'latex')
+            f.Position = [50 50 850 420];
+            plotFormat()
             hold off
         end
     end
@@ -417,7 +408,7 @@ classdef Aerofoil% < handle
             
             val_min = [0, 0.15, -1e-6, nan, 0.15, 0.03, 0, 0.005, 0.001, nan];
             val_max = [nan, 0.65, nan, 1e-6, 0.65, 0.2, nan, nan, nan, 1e-3];
-            norm = [0.5, nan, nan, -0.5, nan, nan, 0.01, 0.05, 0.05, nan];
+            norm = [0.5, nan, -1, -0.5, nan, nan, 0.01, 0.05, 0.05, 1e3];
             name = ["du_f", "cuMax", "dt_f", "dt_r", "ctMax", "tMax", "tMin", "rle", "rle", "du_f2"];
 
             if nargin < 1 || isempty(id), id = 1:numel(val_min); end

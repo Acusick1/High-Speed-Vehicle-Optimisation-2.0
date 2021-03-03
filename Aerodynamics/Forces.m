@@ -15,9 +15,9 @@ classdef Forces < Combinable
                 rinf = flow.rinf;
                 Uinf = flow.Uinf;
                 
-                obj.L = rinf * (Uinf^2) * sum([fco.Cl]) * Aref;
-                obj.D = rinf * (Uinf^2) * sum([fco.Cd]) * Aref;
-                obj.M = rinf * (Uinf^2) * sum([fco.Cm]) * Aref;
+                obj.L = 0.5 * rinf * (Uinf^2) * sum([fco.Cl]) * Aref;
+                obj.D = 0.5 * rinf * (Uinf^2) * sum([fco.Cd]) * Aref;
+                obj.M = 0.5 * rinf * (Uinf^2) * sum([fco.Cm]) * Aref;
             end
         end
     end

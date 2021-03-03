@@ -1,4 +1,4 @@
-function [id, y_out] = halfspace(target, x, y)
+function [id, y_out] = halfspace(target, x, y, extrap)
 %% Halfspace search for lookup table data
 % Find closest x to target and return id, interpolate for y if required
 
@@ -11,6 +11,11 @@ if nargin < 3
     else
         y = [];
     end
+end
+
+if nargin < 4
+    
+    extrap = true;
 end
 
 target = target(:);
@@ -43,15 +48,23 @@ id = m;
 if isempty(y)
     
     y_out = [];
+
 else
+    
     % Find corresponding y values
     maxCon = m == numel(x);
     m(maxCon) = m(maxCon) - 1;
     
-    y0 = y(m, :);
-    y1 = y(m + 1, :);
-    x0 = x(m, :);
-    x1 = x(m + 1, :);
+    y0 = y(m,:);
+    y1 = y(m+1,:);
+    x0 = x(m,:);
+    x1 = x(m+1,:);
     
     y_out = y0 + (target - x0).*((y1 - y0)./(x1 - x0));
+    
+    if ~extrap
+        
+        con = any(id == [1 numel(x)], 2);
+        y_out(con,:) = y(m(con),:);
+    end
 end

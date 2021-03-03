@@ -160,6 +160,20 @@ classdef HASASimp
                         % Apply penalty if i over number of allowed iters
                         obj.mass = inf;
                         obj.Vfuel = inf;
+                    else
+                        bodyVol = obj.body.volume;
+                        % Max volume = usable percentage * total
+                        maxVol = HASASimp.nvol * bodyVol;
+                        
+                        payVol = obj.Vpay * HASASimp.vol_conv;
+                        fuelVol = sum(obj.Vfuel) * HASASimp.vol_conv;
+                        
+                        if payVol + fuelVol > maxVol
+                            
+                            payVol = maxVol - fuelVol;
+                            obj.Vpay = payVol/HASASimp.vol_conv;
+                            obj.Wpay = obj.Vpay * obj.rho_pay;
+                        end
                     end
                     
                     break
@@ -301,17 +315,8 @@ classdef HASASimp
         end
         function a = check(obj)
             %% Feasibility checks
-            % fuel fraction not too high and fuel/payload fits in usable
-            % volume
-            
-            bodyVol = obj.body.volume;
-            % Max volume = usable percentage * total
-            maxVol = HASASimp.nvol * bodyVol;
-            
-            payVol = obj.Vpay * HASASimp.vol_conv;
-            fuelVol = sum(obj.Vfuel) * HASASimp.vol_conv;
-            
-            a = [obj.fuel_frac, (payVol + fuelVol - maxVol)/bodyVol];
+            % fuel fraction not too high
+            a = obj.fuel_frac;
         end
         function obj = set.Vfuel(obj, in)
             
