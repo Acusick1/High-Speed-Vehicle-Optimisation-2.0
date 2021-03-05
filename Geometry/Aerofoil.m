@@ -406,8 +406,8 @@ classdef Aerofoil% < handle
         end
         function a = violation(id)
             
-            val_min = [0, 0.15, -1e-6, nan, 0.15, 0.03, 0, 0.005, 0.001, nan];
-            val_max = [nan, 0.65, nan, 1e-6, 0.65, 0.2, nan, nan, nan, 1e-3];
+            val_min = [0, 0.15, -1e-6, nan, 0.15, 0.04, 0, 0.005, 0.001, nan];
+            val_max = [nan, 0.65, nan, 1e-6, 0.65, 0.15, nan, nan, nan, 1e-3];
             norm = [0.5, nan, -1, -0.5, nan, nan, 0.01, 0.05, 0.05, 1e3];
             name = ["du_f", "cuMax", "dt_f", "dt_r", "ctMax", "tMax", "tMin", "rle", "rle", "du_f2"];
 

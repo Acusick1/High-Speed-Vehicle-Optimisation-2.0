@@ -50,6 +50,7 @@ classdef HASASimp
         Lb
         Sbtot
         Dbe
+        Vtot
         Vpay
         Wpay
         pay_frac
@@ -106,10 +107,11 @@ classdef HASASimp
                 
                 obj = obj.wing_data(w);
             end
-            %% TODO: Double?
+
             obj.Dbe = b.width * obj.m_ft_conv;
             obj.Lb = b.length * obj.m_ft_conv;
             obj.Sbtot = 2 * sum(b.quad_data.area(:)) * obj.m_ft_conv^2;
+            obj.Vtot = b.volume / obj.vol_conv;
         end
         function obj = wing_data(obj, w)
             
@@ -128,13 +130,13 @@ classdef HASASimp
             obj.t_c         = mean(max_t); % Wing thickness to chord ratio
             obj.lambda      = mean(w.taper); % Wing taper ratio
         end
-        function obj = get_payload(obj, vol)
+        function obj = get_payload(obj)
             
-            if nargin < 2 || isempty(vol), vol = obj.body.volume; end
-            
-            % 0.5 needs changed, maybe minus fuel fraction?
-            obj.Vpay = vol * 0.5 * obj.m_ft_conv^3; % Volume of payload
-            obj.Wpay = obj.Vpay * obj.rho_pay; % Weight of payload
+            % Useable volume minus fuel volume = volume of payload
+            useVol = (obj.nvol * obj.Vtot) - sum(obj.Vfuel);
+            % Potential volume, hardcoded maximum (50% of total mass)
+            obj.Wpay = min(useVol * obj.rho_pay, 0.5 * obj.mass);
+            obj.Vpay = obj.Wpay/obj.rho_pay; % Weight of payload
         end
         function obj = main(obj)
             
@@ -161,17 +163,17 @@ classdef HASASimp
                         obj.mass = inf;
                         obj.Vfuel = inf;
                     else
-                        bodyVol = obj.body.volume;
                         % Max volume = usable percentage * total
-                        maxVol = HASASimp.nvol * bodyVol;
-                        
-                        payVol = obj.Vpay * HASASimp.vol_conv;
-                        fuelVol = sum(obj.Vfuel) * HASASimp.vol_conv;
+                        maxVol = HASASimp.nvol * obj.Vtot;
+
+                        payVol = obj.Vpay;
+                        fuelVol = sum(obj.Vfuel);
                         
                         if payVol + fuelVol > maxVol
                             
+                            % Reset payload volume if needed
                             payVol = maxVol - fuelVol;
-                            obj.Vpay = payVol/HASASimp.vol_conv;
+                            obj.Vpay = payVol;
                             obj.Wpay = obj.Vpay * obj.rho_pay;
                         end
                     end
@@ -182,22 +184,11 @@ classdef HASASimp
                 end
             end
             
-            if isempty(obj.pay_frac), obj.pay_frac = obj.Wpay/obj.mass; end
+            obj.pay_frac = obj.Wpay/obj.mass;
         end
         function [obj, Wgtot] = weigh(obj)
             
             Wgtot = obj.mass;
-            
-            %% Payload defined by fraction of total mass, or by body volume
-            if ~isempty(obj.pay_frac)
-                
-                obj.Wpay = Wgtot * obj.pay_frac;
-                obj.Vpay = obj.Wpay/obj.rho_pay;
-            
-            elseif isempty(obj.Wpay)
-                
-                obj = obj.get_payload;
-            end
             
             %% TODO: Need values
             rho_t = [0, 0, obj.rho_th, obj.rho_t0, 0]'; % ?
@@ -228,6 +219,15 @@ classdef HASASimp
             obj.Vfuel = Wfuel./rho_fuel;
             % Tank density and volume of fuel
             Wtnk = sum(rho_t .* obj.Vfuel);
+            
+            %% Payload defined by fraction of total mass, or by body volume
+            if ~isempty(obj.pay_frac)
+                
+                obj.Wpay = Wgtot * obj.pay_frac;
+                obj.Vpay = obj.Wpay/obj.rho_pay;
+            else
+                obj = obj.get_payload;
+            end
             
             %% Structural
             
@@ -315,8 +315,8 @@ classdef HASASimp
         end
         function a = check(obj)
             %% Feasibility checks
-            % fuel fraction not too high
-            a = obj.fuel_frac;
+            % fuel fraction not too high, payload mass > 0
+            a = [obj.fuel_frac, obj.Wpay];
         end
         function obj = set.Vfuel(obj, in)
             
