@@ -215,7 +215,7 @@ classdef Fuse3d < Body
             a(2) = struct('name', "w", 'min', 0.1, 'max', 0.8);
             a(3) = struct('name', "h", 'min', [0.1 0.1], 'max', [0.8 0.8]);
             % Spanwise upper/lower curvature: 0 = tall/box, 1 = cylindrical
-            a(4) = struct('name', "nc", 'min', [0.1 0.025], 'max', [1 1]);
+            a(4) = struct('name', "nc", 'min', [0.1 1e-3], 'max', [1 1]);
             % Streamwise nose/tail curvature: 0 = flat/box, 1 = knife
             a(5) = struct('name', "nd", 'min', [0.25 1e-3], 'max', [0.95 0.8]);
             %% TODO: linear Ac1 > Ac2 rather than fuse height constraint

@@ -14,7 +14,8 @@ classdef Body < Geometry
         conical = true
         %% TODO: Fixes for coarse bodies in wingbody
         % exits with ~any(nan) but interferes with first/last panels and errors
-        yDisc = 0.5:0.025:1
+        % yDisc = 0.5:0.025:1
+        yDisc = 0.5*(1-cos(((30:60)*pi)./60))
         xDisc = 0.5*(1-cos(((0:80)*pi)./80))'
     end
     
@@ -25,8 +26,7 @@ classdef Body < Geometry
         end
         function a = get.height(obj)
             
-            zmid = obj.z(:, [end 1])';
-            a = max(diff(zmid));
+            a = max(obj.z(:)) - min(obj.z(:));
         end
         function a = get.area(obj)
 
