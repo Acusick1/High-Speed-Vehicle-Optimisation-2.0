@@ -5,6 +5,7 @@ classdef Flightstate
         alpha
         Minf
         altitude
+        beta = 0
         delta
         Machq
         delq
@@ -107,7 +108,7 @@ classdef Flightstate
         end
         function a = get.U(obj)
             
-            a = obj.Uinf * [cos(obj.alpha), 0, sin(obj.alpha)];
+            a = obj.Uinf * [cos(obj.alpha) * cos(obj.beta), sin(obj.beta), sin(obj.alpha)];
         end
     end
     

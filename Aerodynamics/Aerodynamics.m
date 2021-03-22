@@ -22,11 +22,13 @@ classdef Aerodynamics
         coneTable
         vmax
         dCm_dalpha
+        dCl_dbeta
         
         trim = false
         part
         weight
         alpha_opt
+        latStab = true
     end
     
     properties (Dependent)
@@ -112,6 +114,7 @@ classdef Aerodynamics
                         
                         obj(i,j).alpha_opt = obj(i-1,j).alpha_opt;
                         obj(i,j).dCm_dalpha = obj(i-1,j).dCm_dalpha;
+                        obj(i,j).dCl_dbeta = obj(i-1,j).dCl_dbeta;
                     end
                 end
                 
@@ -137,6 +140,7 @@ classdef Aerodynamics
                     fc = [obj(i,:).force_coeffs];
                     lift = sum([f.L]);
                     Cm = sum([fc.Cm]);
+                    Cl = sum([fc.Cl]);
                     
                     if ~temp.trim
                         break
@@ -154,9 +158,11 @@ classdef Aerodynamics
                             
                             if t.alpha > p.alpha
                                 
-                                dCm = (Cm - p.Cm)/(t.alpha - p.alpha);
+                                % dCm = (Cm - p.Cm)/(t.alpha - p.alpha);
+                                dCm = (Cm - p.Cm)/(Cl - p.Cl);
                             else
-                                dCm = (p.Cm - Cm)/(p.alpha - t.alpha);
+                                % dCm = (p.Cm - Cm)/(p.alpha - t.alpha);
+                                dCm = (p.Cm - Cm)/(p.Cl - Cl);
                             end
                             
                             if isnan(dCm), dCm = 1; end
@@ -165,6 +171,7 @@ classdef Aerodynamics
                             break
                         else
                             p.Cm = Cm;
+                            p.Cl = Cl;
                             p.alpha = obj(i,1).flow.alpha;
                             
                             [t, alpha_conv] = update_alpha(lift, t);
@@ -177,6 +184,39 @@ classdef Aerodynamics
                             obj(i,j).alpha_opt = t.alpha;
                         end
                     end
+                end
+                
+                %% TODO: Better way of only coming in here for non-uncertainty flight states
+                if temp.latStab && temp.trim
+                    
+                    for j = nParts:-1:1
+                        
+                        side1(i,j) = obj(i,j);
+                        side2(i,j) = obj(i,j);
+                        side1(i,j).flow.beta = deg2rad(0.5);
+                        side2(i,j).flow.beta = deg2rad(0.5);
+                        
+                        geometry = varargin{j};
+                        
+                        if ~isempty(geometry)
+                            
+                            mirror = geometry;
+                            
+                            mirror.x = flip(mirror.x, 2);
+                            mirror.y = flip(-mirror.y, 2);
+                            mirror.z = flip(mirror.z, 2);
+                            mirror = mirror.get_data;
+                            
+                            side1(i,j) = side1(i,j).main(geometry);
+                            side2(i,j) = side2(i,j).main(mirror);
+                        end
+                    end
+                    
+                    fc1 = [side1(i,:).force_coeffs];
+                    fc2 = [side2(i,:).force_coeffs];
+                    Clb = sum([fc1.Cl] + [fc2.Cl])/2;
+                    
+                    obj(i,1).dCl_dbeta = (Clb - Cl)/deg2rad(0.5);
                 end
             end
             
@@ -270,7 +310,7 @@ classdef Aerodynamics
             dim = size(area);
             
             obj = obj.surface_velocity(unit_norm);
-            d = asin(dotmat(-Unorm, unit_norm));
+            d = asin(min(max(dotmat(-Unorm, unit_norm), -1), 1));
             d(area == 0) = 0;
             
             con = isnan(d);
