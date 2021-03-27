@@ -15,6 +15,7 @@ if nargin < 2 || isempty(axesSpec)
                 'box',                  'on'    , ...
                 'XMinorTick',           'on'    , ...
                 'YMinorTick',           'on'    , ...
+                'ZMinorTick',           'on'    , ...
                 'TickLabelInterpreter', 'latex'};
 end
 if nargin < 3 || isempty(axesSpec)
@@ -31,7 +32,9 @@ for i = 1:numel(axes)
     if strcmp(get(axes(i),'tag'), 'legend')
         
         set(axes(i), legendSpec{:});
-    else
+    
+    elseif isempty(get(axes(i),'tag'))
+    
         set(axes(i), axesSpec{:})
         
         data = get(axes(i), 'Children');

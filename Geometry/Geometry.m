@@ -242,7 +242,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             % with nose radius
             a = (rad(1:end-1) + rad(2:end))/2;
         end
-        function splot = plot(obj, quad, surf_data)
+        function splot = plot(obj, quad, surf_data, views)
             
             if nargin < 2 || isempty(quad) || quad
                 
@@ -257,22 +257,34 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             ny = data.norm(:,:,2);
             nz = data.norm(:,:,3);
             
-            % Front and isometric
-            views = [-90 0; -45, 25];
-            % Top and bottom
-            % views = [90 90; 90, -90];
-            views = views(2,:);
+            colour = [0.6 0.6 0.6];
             
+            if nargin < 4 || isempty(views)
+                % Front and isometric
+                views = [-90 0; -45, 25];
+                % Top and bottom
+                % views = [90 90; 90, -90];
+                views = views(2,:);
+                
+                %views = [0 90; -90 0; 0 0];
+            end
+            
+            splot = [];
             nviews = size(views, 1);
             figure(gcf)
             % clf
             for i = 1:nviews
                 
-                splot(i) = subplot(1, nviews, i);
+                % Single row
+                % splot(i) = subplot(1, nviews, i);
+                % Single column
+                % splot(i) = subplot(nviews, 1, i);
                 hold on
-                if nargin < 3
-                    plot3(obj.x, obj.y, obj.z, 'k')
-                    plot3(obj.x', obj.y', obj.z', 'k')
+                if nargin < 3 || isempty(surf_data)
+                    
+                    h(1) = surf(obj.x,obj.y,obj.z,'LineWidth',0.05);
+                    h(2) = surf(obj.x,-obj.y,obj.z,'LineWidth',0.05);
+                    set(h,'FaceColor',colour,'FaceLighting','flat');%, 'EdgeColor','none');
                 else
                     h(1) = surf(obj.x, obj.y, obj.z, surf_data);
                     h(2) = surf(obj.x, -obj.y, obj.z, surf_data);
@@ -280,8 +292,13 @@ classdef Geometry% < handle & matlab.mixin.Copyable
                     % colorbar
                 end
                 view(views(i,:))
-                box on
-                axis equal tight off
+                plotFormat
+                box off
+                % axis equal tight off
+                axis equal %tight
+                xlabel('x, $m$', 'Interpreter', 'latex')
+                ylabel('y, $m$', 'Interpreter', 'latex')
+                zlabel('z, $m$', 'Interpreter', 'latex')
                 hold off
             end
         end
@@ -365,7 +382,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
         end
         function plotter(varargin)
             
-            colour=[0.6 0.6 0.6];
+            colour = [0.6 0.6 0.6];
             figure
             hold on
             for i = 1:length(varargin)
@@ -381,8 +398,8 @@ classdef Geometry% < handle & matlab.mixin.Copyable
                     ny = data.unit_norm(:,:,2);
                     nz = data.unit_norm(:,:,3);
                     plot3(cx + nx, cy + ny, cz + nz, 'rx')
-                    h = surf(obj.x,obj.y,obj.z,'LineWidth',0.05);
-                    set(h,'FaceColor',colour,'FaceLighting','flat');%'EdgeColor','none');
+                    h = surf(obj.x, obj.y, obj.z, 'LineWidth', 0.05);
+                    set(h, 'FaceColor', colour, 'FaceLighting', 'flat');%'EdgeColor','none');
                 end
             end
            

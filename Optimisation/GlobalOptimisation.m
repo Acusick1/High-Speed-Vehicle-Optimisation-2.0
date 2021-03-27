@@ -99,9 +99,11 @@ classdef GlobalOptimisation < Optimisation
             t = obj.maxIt + 1;
             cons = obj.penalty;
             nCon = size(cons, 2);
-            midIt = ceil(obj.maxIt/2);
+            % Switching condition limited to 500 iterations > set to ef
+            % after
+            switchIt = min(ceil(obj.maxIt/2), 500);
             
-            if nargin < 2 || isempty(tf), tf = midIt; end
+            if nargin < 2 || isempty(tf), tf = switchIt; end
             if nargin < 3 || isempty(ef), ef = 0; end
             
             % Have to set as zero first, otherwise max will be Inf
@@ -120,6 +122,8 @@ classdef GlobalOptimisation < Optimisation
                 
                 tEnd = ef; 
             else
+                % Adjusting tf for ef = 0 case. Tend towards non-zero
+                % value, then linearly reduce to zero
                 tEnd = 1e-3;
                 tf = 0.75*tf;
             end
@@ -131,11 +135,11 @@ classdef GlobalOptimisation < Optimisation
                 e(1, j) = 0.5*(mean(conj) + min(conj));
             end
             
-            for i = 1:midIt
+            for i = 1:switchIt
                     
                 if i > tf
                     % Linear
-                    ei = interp1([tf midIt], [tEnd 0], i);
+                    ei = interp1([tf switchIt], [tEnd 0], i);
                     %ei = ef + i * (0 - ef)/tf;
                     
                 else

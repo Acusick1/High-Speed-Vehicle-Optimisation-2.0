@@ -130,9 +130,9 @@ classdef Viscous
             Te = obj.Tedge;
             Me = obj.Medge;
             % Pe = obj.Pre;
-            Ve = Me * obj.a;
+            % Ve = Me * obj.a;
+            Ve = magmat(obj.Vedge);
             turb = obj.turbulent;
-            % Ve = magmat(obj.Vedge);
             
             %%
             % Original Eckert's reference temperature method

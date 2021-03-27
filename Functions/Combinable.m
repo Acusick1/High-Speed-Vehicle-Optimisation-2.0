@@ -31,17 +31,19 @@ classdef Combinable
                 obj.(fn{i}) = sum([objarray.(fn{i})]);
             end
         end
-        function obj = mean_sigma_var(obj, sigma)
+        function [m, v] = mean_var(obj)
             
             if numel(obj) > 1, obj = obj.combine; end
-            if nargin < 2 || isempty(sigma), sigma = 3; end
             
             fn = fieldnames(obj);
+            m = obj;
+            v = obj;
             
             for i = 1:numel(fn)
                 
                 val = obj.(fn{i});
-                obj.(fn{i}) = mean(val) + sigma*var(val);
+                m.(fn{i}) = mean(val);
+                v.(fn{i}) = var(val);
             end
         end
     end

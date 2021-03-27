@@ -50,8 +50,6 @@ classdef MFPSO < PSO
                 a.(fn{i}) = obj.best.(fn{i})(best_id,:);
             end
             
-            
-            
             if isempty(obj.gBest) || a.cost < obj.gBest.cost
                 
                 % Has to be run through hf cost function and rechecked
@@ -147,7 +145,15 @@ classdef MFPSO < PSO
                 
                 obj.hist(i,:) = obj.gBest;
                 
-                if any(i-1 == obj.save_it), obj.save_opt(i-1); end
+                if any(i-1 == obj.save_it)
+                
+                    obj.save_opt(i-1);
+                    % Resetting parpool to avoid OOM errors
+                    if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
+                        
+                        delete(gcp); 
+                    end
+                end
                 
                 if isequaln(obj.hist(i), obj.hist(i-1))
                     

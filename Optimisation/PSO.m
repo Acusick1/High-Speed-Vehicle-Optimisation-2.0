@@ -264,13 +264,21 @@ classdef PSO < GlobalOptimisation
                 obj.variables(sets(:,3), :) =...
                     obj.nonuni_mutation(obj.variables(sets(:,3), :), i-1);
                 
-                obj = obj.update_cost();
+                obj = obj.update_cost(i-1);
                 obj = obj.update_best(obj.con_tol(i));
                 obj = obj.update_gBest();
                 
                 obj.hist(i,:) = obj.gBest;
                 
-                if any(i-1 == obj.save_it), obj.save_opt(i); end
+                if any(i-1 == obj.save_it)
+                
+                    obj.save_opt(i-1);
+                    % Resetting parpool to avoid OOM errors
+                    if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
+                        
+                        delete(gcp); 
+                    end
+                end
                 
                 if isequaln(obj.hist(i), obj.hist(i-1))
                     

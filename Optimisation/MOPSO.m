@@ -86,7 +86,7 @@ classdef MOPSO < PSO
                 if any(i-1 == obj.save_it)
                     
                     obj.save_opt(i-1);
-                    %% Attempt to reset parpool to avoid OOM errors
+                    % Resetting parpool to avoid OOM errors
                     if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
                         
                         delete(gcp); 

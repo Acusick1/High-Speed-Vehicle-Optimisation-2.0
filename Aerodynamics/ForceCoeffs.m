@@ -9,6 +9,7 @@ classdef ForceCoeffs < Combinable
         CA
         Cf
         Cd
+        Cl_Cd
     end
     
     methods
@@ -44,9 +45,11 @@ classdef ForceCoeffs < Combinable
                 f.CN = -Cp .* area .* nz;
                 f.CA = -Cp .* area .* nx;
                 
-                if ~isempty(Cf)
-                 
+                if isempty(Cf)
+                    f.Cd = f.Cdp;
+                else
                     f.Cf = Cf .* area;
+                    f.Cd = f.Cdp + f.Cf;
                 end
                 
                 %% Sum and normalise coefficients
@@ -56,15 +59,6 @@ classdef ForceCoeffs < Combinable
                     
                     obj.(fn{i}) = sum(f.(fn{i})(:))/Aref;
                 end
-            end
-        end
-        function a = get.Cd(obj)
-            
-            if isempty(obj.Cf)
-                
-                a = obj.Cdp;
-            else
-                a = obj.Cdp + obj.Cf;
             end
         end
     end
