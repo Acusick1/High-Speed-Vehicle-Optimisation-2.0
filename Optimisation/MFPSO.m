@@ -9,8 +9,11 @@ classdef MFPSO < PSO
         hf_penalties
         hf_cost_fun
         hf_completed
+        hf_confidence
         data
         it_hf
+        hf_min_dist = 10
+        hf_nInt = 100
     end
     
     methods
@@ -29,9 +32,17 @@ classdef MFPSO < PSO
             
             id = obj.mf_id;
             
+            if obj.it_hf > obj.hf_min_dist
+                
+                iInt = min(obj.it_hf - obj.hf_min_dist, obj.hf_nInt);
+                pred = [pred_data(:,1) pred_ci(:,1)];
+                pred_data(:,1) = interp1([1 obj.hf_nInt], pred, iInt);
+            end
+            
             % obj.lf_cost = obj.cost;
             pred_cost = obj.cost + pred_data(:,1);
             obj.cost = pred_cost;
+            obj.hf_confidence = pred_ci;
             
             % obj.lf_penalties = obj.penalties(id);
             pred_penalties = obj.penalties(:,id) + pred_data(:,2:end);

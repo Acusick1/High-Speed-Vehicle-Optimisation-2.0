@@ -4,7 +4,7 @@ function [foils, test_var, test_pen] = geo_doe(g_fun, var_obj, nDoe)
 nOpt = var_obj.nOpt;
 
 % Number of designs to test for geometric violation design of experiment
-nDes = 1000 * nOpt;
+nDes = 10000 * nOpt;
 
 % Geometric DOE positions
 [~, var] = var_obj.init_lhs(nDes);
