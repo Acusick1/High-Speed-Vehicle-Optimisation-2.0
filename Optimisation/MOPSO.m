@@ -62,6 +62,7 @@ classdef MOPSO < PSO
                 % distance = Population.crowding(obj.PF.cost);
                 distance = distancecrowding([],obj.PF.cost);
                 best_id(1) = obj.roulette(obj.PF.nDom);
+                %% TODO: CHECK THIS < EXTREMES HAVE DISTANCE = INF??
                 best_id(2) = obj.roulette(distance, true);
                 % best_id(2) = obj.roulette(obj.PF.nDom, true);
                 

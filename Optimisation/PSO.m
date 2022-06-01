@@ -47,23 +47,26 @@ classdef PSO < GlobalOptimisation
             obj.par_vel = zeros(obj.var_size);
             obj.penalty = zeros(obj.nPop, 1);
         end
-        function obj = update_cost(obj)
+        function obj = update_cost(obj, i)
             %% TODO: Hacky
             % Allows combined cost/vio functions to be used (default) along
             % with cost only functions
             try
                 [obj.cost, obj.penalty, obj.penalties] = obj.cost_fun(obj.variables);
-            catch
-                obj.cost = obj.cost_fun(obj.variables);
-                
-                if isempty(obj.vio_fun)
-                
-                    obj.penalties = zeros(obj.nPop, 1);
-                else
-                    obj.penalties = max(0, obj.vio_fun(obj.variables));
-                    obj.penalty = sum(obj.penalties, 2);
-                end
+            catch ME
+                obj.save_opt(i);
+                rethrow(ME)
             end
+%                 obj.cost = obj.cost_fun(obj.variables);
+%                 
+%                 if isempty(obj.vio_fun)
+%                 
+%                     obj.penalties = zeros(obj.nPop, 1);
+%                 else
+%                     obj.penalties = max(0, obj.vio_fun(obj.variables));
+%                     obj.penalty = sum(obj.penalties, 2);
+%                 end
+%             end
         end
         function obj = init_best(obj)
             
@@ -186,7 +189,7 @@ classdef PSO < GlobalOptimisation
             [obj.variables, obj.best.variables] = ...
                 deal(obj.init_lhs(obj.nPop));
             
-            obj = obj.update_cost();
+            obj = obj.update_cost(0);
             
             obj.best.cost = obj.cost;
             obj.best.penalty = obj.penalty;
@@ -199,13 +202,13 @@ classdef PSO < GlobalOptimisation
             for i = 2:obj.maxIt + 1
                 
                 obj = obj.update_position();
-                obj = obj.update_cost();
+                obj = obj.update_cost(i-1);
                 obj = obj.update_best();
                 obj = obj.update_gBest();
                 
                 obj.hist(i,:) = obj.gBest;
                 
-                if any(i-1 == obj.save_it), obj.save_opt(i); end
+                if any(i-1 == obj.save_it), obj.save_opt(i-1); end
                 
                 if isequaln(obj.hist(i), obj.hist(i-1))
                     
@@ -233,7 +236,7 @@ classdef PSO < GlobalOptimisation
             
             hood = obj.single_link_neighbour(obj.nPop, 4);
             
-            obj = obj.update_cost();
+            obj = obj.update_cost(0);
             obj = obj.init_best();
             obj = obj.update_gBest();
             obj = obj.constraint_tolerance();

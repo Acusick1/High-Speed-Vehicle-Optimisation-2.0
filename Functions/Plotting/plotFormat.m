@@ -20,8 +20,8 @@ if nargin < 2 || isempty(axesSpec)
 end
 if nargin < 3 || isempty(axesSpec)
     
-    lineSpec = {'LineWidth',            1       , ...
-                'MarkerSize',           14};
+    lineSpec = {'LineWidth',            1.5     , ...
+                'MarkerSize',           18};
 end
 
 legendSpec = {'Interpreter',      'latex'};
@@ -40,7 +40,10 @@ for i = 1:numel(axes)
         data = get(axes(i), 'Children');
         for j = 1:numel(data)
             
-            set(data(j), lineSpec{:})
+            if isa(data(j), 'matlab.graphics.chart.primitive.Line')
+            
+                set(data(j), lineSpec{:})
+            end
         end
     end
 end

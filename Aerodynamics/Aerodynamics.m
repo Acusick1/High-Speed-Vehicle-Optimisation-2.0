@@ -38,7 +38,7 @@ classdef Aerodynamics
     properties %(Constant)
         
         impact_method = struct(...
-            'newtonian', ["nose", "default", "foil"], ...
+            'newtonian', ["nose", "default"], ...
             'tangentobs', ["foil", "tail", "wing", "wedge"], ...
             'tangentcone', ["body", "fuse"], ...
             'obspm', ["cone"]);
@@ -327,8 +327,8 @@ classdef Aerodynamics
             im(obj.del > 0 & area > 0) = iid;
             % im(obj.del > 0) = iid;
             % Angle to flow too large for attached shock
-            % 95% used to avoid close calls being returned as NaN from tbm
-            im(im & obj.del >= f.maxDel * 0.95) = 1;
+            % 99% used to avoid close calls being returned as NaN from tbm
+            im(im & obj.del >= f.maxDel * 0.99) = 1;
             
             % Any method other than newtonian requires attached shock
             shock = im > 1;

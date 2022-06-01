@@ -13,10 +13,9 @@ classdef BezierFoil < Aerofoil & Bezier
             
             if nargin > 0
                 
+                if nargin >= 2 && ~isempty(type), obj.type = type; end
+                % Here for set method, relies on arg 2
                 obj.control_points = control_points;
-                
-                %%
-                if nargin > 3 && ~isempty(type), obj.type = type; end
                 
                 switch obj.type
                 
@@ -40,7 +39,7 @@ classdef BezierFoil < Aerofoil & Bezier
                     t = obj.curve(:,:,1);
                     c = obj.curve(:,:,2);
                     
-                    t(:,2) = interpulinex(t, c(:,1));
+                    t(:,2) = interp1(t(:,1), t(:,2), c(:,1));
                     n = Aerofoil.normal(c);
                     
                     xu = c(:,1) + t(:,2) .* n(:,1);
@@ -91,25 +90,23 @@ classdef BezierFoil < Aerofoil & Bezier
             switch type
                 case "direct"
                     
-                    cp1(:,1) = [1, 0.75, 0.6, 0.4, 0.29, 0.24, 0];
-                    cp1(:,2) = [0, 0.01, 0.09, -0.03, 0, 0.11, 0];
+                    cp1(:,1) = [1, 0.75, 0.6, 0.4, 0.29, 0.14, 0];
+                    cp1(:,2) = [0, 0.01, 0.09, 0.06, 0.02, 0.11, 0];
                     cp2(:,1) = [1, 0.75, 0.6, 0.4, 0.5, 0.05, 0];
                     cp2(:,2) = [0, 0, -0.05, -0.06, -0.06, -0.07, 0];
                     
                 case "tc"
                     
-                    cp1(:,1) = [1, 0.75, 0.6, 0.4, 0.29, 0.24, 0];
-                    cp1(:,2) = [0, 0.01, 0.05, 0.1, 0.05, 0.1, 0];
+                    cp1(:,1) = [1, 0.75, 0.6, 0.4, 0.25, 0.1, 0];
+                    cp1(:,2) = [0, 0.01, 0.05, 0.08, -0.025, 0.06, 0];
                     cp2(:,1) = [1, 0.75, 0.6, 0.5, 0.3, 0.05, 0];
-                    cp2(:,2) = [0, 0, 0.01, 0.02, 0.02, 0.01, 0];
+                    cp2(:,2) = [0, 0, 0.01, 0.02, 0.05, 0.03, 0];
             end
             
             b = [cp1 cp2];
             
             [aerofoil] = BezierFoil(b, type);
-            aerofoil.plotter(aerofoil)
-            aerofoil.bez(1).doplot
-            aerofoil.bez(2).doplot
+            aerofoil.plot(aerofoil)
         end
         function [init, a] = define(type, n, crossover, zMean, zVar, edgeVar)
             

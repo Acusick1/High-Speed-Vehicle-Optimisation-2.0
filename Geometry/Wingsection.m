@@ -12,8 +12,9 @@ classdef Wingsection < Geometry
     
     properties
         
-        xDisc (1,1) string {mustBeMember(xDisc,{'Linear', 'Cosine', 'Halfcosine'})} = 'Linear'
-        % Set to positive number to discretise wing by target dim yDisc
+        xDiscMethod (1,1) string {mustBeMember(xDiscMethod,{'Linear', 'Cosine', 'Halfcosine'})} = 'Linear'
+        xDisc = 100
+        % Set to positive number to discretise wing by target dimension
         yDisc = 0
         nParts
         nPanels
@@ -60,6 +61,15 @@ classdef Wingsection < Geometry
         end
         function obj = dogenerate(obj)
             
+            aerofoils = obj.sections;
+            nFoil = numel(aerofoils);
+            xnorm = obj.disc_method();
+            
+            for i = nFoil:-1:1
+                
+                aerofoils(i) = aerofoils(i).redist(xnorm);
+            end
+            
             LE = obj.lead_edge;
             
             chords = obj.chord;
@@ -79,9 +89,6 @@ classdef Wingsection < Geometry
                 end
             end
             di = temp;
-            
-            aerofoils = obj.sections;
-            nFoil = numel(aerofoils);
             
             if nFoil < nChords
                 
@@ -108,7 +115,7 @@ classdef Wingsection < Geometry
             
             if obj.yDisc
                 
-                obj.span_disc;
+                obj = obj.span_disc;
             else
                 obj.nPanels = ones(1, obj.nParts);
             end
@@ -251,8 +258,8 @@ classdef Wingsection < Geometry
         end
         function x_nd = disc_method(obj, np, method)
             
-            if nargin < 2 || isempty(np), np = 100; end
-            if nargin < 3 || isempty(method), method = obj.xDisc; end
+            if nargin < 2 || isempty(np), np = obj.xDisc; end
+            if nargin < 3 || isempty(method), method = obj.xDiscMethod; end
             
             x = (0:np)';
             
@@ -340,31 +347,25 @@ classdef Wingsection < Geometry
                 (loc - 1) .* (1 - obj.taper)./(1 + obj.taper));
             sweep(isnan(sweep)) = 0;
         end
-        function section = clean_sections(obj, in)
+        function section = clean_sections(obj, section)
             
-            if isobject(in)
+            if isobject(section)
                 
                 dim = obj.nParts + 1;
                 
-                if length(in) ~= dim
+                if length(section) ~= dim
                     
-                    in(1:dim) = in;
+                    section(1:dim) = section;
                 end
                 
-            elseif iscell(in)
+            elseif iscell(section)
                 
-                for i = numel(in):-1:1
+                for i = numel(section):-1:1
                     
-                    temp(i) = Aerofoil(in{i});
+                    temp(i) = Aerofoil(section{i});
                 end
                 
-                in = temp;
-            end
-            
-            xnorm = obj.disc_method();
-            for i = numel(in):-1:1
-                
-                section(i) = in(i).redist(xnorm);
+                section = temp;
             end
         end
     end

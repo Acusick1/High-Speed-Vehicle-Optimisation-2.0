@@ -126,8 +126,10 @@ classdef Aerofoil% < handle
         end
         function obj = redist(obj, x)
             
-            zup = obj.interp(obj.xu, obj.zu, x);
-            zlo = obj.interp(obj.xl, obj.zl, x);
+            x = x(:);
+            
+            zup = obj.interp(obj.xu, obj.zu, x, 'pchip');
+            zlo = obj.interp(obj.xl, obj.zl, x, 'pchip');
             obj.xu = x;
             obj.xl = x;
             obj.zu = zup;
@@ -292,6 +294,7 @@ classdef Aerofoil% < handle
             t = obj.minThick/2;
             
             cc = (c(1:end-1,:) + c(2:end,:))/2;
+            cc = c;
             
             xu_int = cc(:,1) + t .* n(:,1);
             zu_int = cc(:,2) + t .* n(:,2);
@@ -357,6 +360,26 @@ classdef Aerofoil% < handle
             xlabel('x/c', 'Interpreter', 'latex')
             ylabel('z/c', 'Interpreter', 'latex')
             f.Position = [50 50 850 420];
+            
+            if isa(obj, 'BezierFoil')
+                
+                plot(obj.control_points(:,1), obj.control_points(:,2), 'ko')
+                plot(obj.control_points(:,3), obj.control_points(:,4), 'kx')
+                
+                if strcmp(obj.type, "tc")
+
+                    figure(gcf)
+                    hold on
+                    plot(obj.camber(:,1), obj.thickness(:,1), 'k --') 
+                    plot(obj.camber(:,1), obj.camber(:,2), 'k-.') 
+                    hold off
+
+                    legend('Aerofoil', 'Thickness Control Points', 'Camber Control Points', 'Thickness Curve', 'Camber Curve', 'interpreter', 'latex')
+                else
+                    legend('Aerofoil', 'Upper Control Points', 'Lower Control Points', 'interpreter', 'latex')
+                end
+            end
+            
             plotFormat()
             hold off
         end
@@ -403,6 +426,8 @@ classdef Aerofoil% < handle
             
             [nx, nz] = normal2D(c(:,1), c(:,2));
             a = [nx, nz];
+            %% TODO: Hack
+            %a(end+1,:) = a(end,:);
         end
         function a = violation(id)
             

@@ -261,12 +261,14 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             
             if nargin < 4 || isempty(views)
                 % Front and isometric
-                views = [-90 0; -45, 25];
+                views = [-90 20; -45, 25];
                 % Top and bottom
                 % views = [90 90; 90, -90];
-                views = views(2,:);
+                % views = views(2,:);
                 
                 %views = [0 90; -90 0; 0 0];
+            %else
+                %views = [-45, 25];
             end
             
             splot = [];
@@ -276,7 +278,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             for i = 1:nviews
                 
                 % Single row
-                % splot(i) = subplot(1, nviews, i);
+                splot(i) = subplot(1, nviews, i);
                 % Single column
                 % splot(i) = subplot(nviews, 1, i);
                 hold on
@@ -295,7 +297,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
                 plotFormat
                 box off
                 % axis equal tight off
-                axis equal %tight
+                axis equal tight
                 xlabel('x, $m$', 'Interpreter', 'latex')
                 ylabel('y, $m$', 'Interpreter', 'latex')
                 zlabel('z, $m$', 'Interpreter', 'latex')

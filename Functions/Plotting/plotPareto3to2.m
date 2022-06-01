@@ -1,4 +1,4 @@
-function f = plotPareto3to2(cost, axisLabels, invert)
+function f = plotPareto3to2(cost, axisLabels, invert, chosen)
 % Plot 3D pareto fronts in 2D with colourbar for third dimension
 
 axesSpec = {'FontSize',     14      , ...
@@ -11,7 +11,7 @@ normCost = cost;
 normCost(:,invert) = -normCost(:,invert);
 normCost = normalize(normCost, 'range');
 f = figure;
-f.Position = [0,353,1535,365];
+f.Position = [0,353,1050,365];
 
 colour = flip(bone(256));
 % Removing too light entries
@@ -26,9 +26,14 @@ for i = 1:3
     set(gca, axesSpec{:});
     grid on
     
-    scatter(cost(:,1), cost(:,2), 10, cost(:,3), 'filled')
+    scatter(cost(:,1), cost(:,2), 12, cost(:,3), 'filled')
+    
+    if nargin >= 4
+        plot(cost(chosen,1), cost(chosen,2), 'ko', 'Markersize', 10, 'LineWidth', 1.5)
+    end
+    
     % caxis([min(cost(:,3)) max(cost(:,3))])
-    cb = colorbar;
+    cb = colorbar('NorthOutside');
     cb.FontSize = 14;
     cb.TickLabelInterpreter = 'latex';
     cb.Label.Interpreter = 'latex';
@@ -38,6 +43,7 @@ for i = 1:3
     cost        = circshift(cost, 1, 2);
     normCost    = circshift(normCost, 1, 2);
     axisLabels  = circshift(axisLabels, 1, 2);
+    axis square
     hold off
 end
 end

@@ -104,16 +104,20 @@ classdef Viscous
                 Tw = real(((q - 0)./(obj.eps * obj.STF) + obj.Tinf.^4).^0.25);
                 
                 %% TODO: CLEAN
-                Tw(obj.part.quad_data.area == 0) = 0;
+                try
+                    Tw(obj.part.quad_data.area == 0) = 0;
+                catch
+                    Tw(obj.part.data.area == 0) = 0;
+                end
                 %con = Tw > obj.Taw | ~isfinite(Tw) | imag(Tw) > 0;
                 %Tw(con) = obj.Taw(con);
                 
                 if i > 1
-                    
-                    dTw = Tw - prev;
+                    %% TODO: Leading edge instability
+                    dTw = Tw(2:end,:) - prev(2:end,:);
                     abs_diff = sum(dTw(:).^2);
                     
-                    if abs_diff < 1e-6 || i == maxIt
+                    if all(isfinite(Tw(:))) && (abs_diff < 1e-6 || i >= maxIt)
                         
                         % Only reset Twall here incase of prescribed Twall
                         obj.Twall = Tw;
@@ -371,11 +375,11 @@ classdef Viscous
             end
         end
         function h = get_enthalpy(obj, T)
-            %% Calorifically perfect gas: Anderson2006 p276
+            % Calorifically perfect gas: Anderson2006 p276
             h = obj.cp * T;
         end
         function T = get_temperature(obj, h)
-            %% Calorifically perfect gas: Anderson2006 p276
+            % Calorifically perfect gas: Anderson2006 p276
             T = h / obj.cp;
         end
         function a = get.Cf(obj)
@@ -388,12 +392,22 @@ classdef Viscous
             if obj.part.conical
                 
                 le = mean(obj.part.points(1,:,:));
+                centre = obj.part.centre - le;
+                centre = [zeros(1, size(centre, 2), 3); centre];
             else
-                le = (obj.part.points(1,1:end-1,:) + ...
-                    obj.part.points(1,2:end,:))/2;
+                %% TODO: Correct? Make consistent                
+                try
+                    le = (obj.part.points(1,1:end-1,:) + ...
+                        obj.part.points(1,2:end,:))/2;
+                    centre = obj.part.centre - le;
+                    centre = [zeros(1, size(centre, 2), 3); centre];
+                catch
+                    le = zeros(1, 1, 2);
+                    centre = obj.part.data.centre - le;
+                    centre = [zeros(1, size(centre, 2), 2); centre];
+                end
             end
-            centre = obj.part.centre - le;
-            centre = [zeros(1, size(centre, 2), 3); centre];
+
             a = cumsum(magmat(diff(centre)));
         end
         function a = get.Uinf(obj)

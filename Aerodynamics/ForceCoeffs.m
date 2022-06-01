@@ -41,16 +41,19 @@ classdef ForceCoeffs < Combinable
                     ((Cp .* area .* ny) * sin(xzAngle)) -...
                     ((Cp .* area .* nz) * sin(xyAngle));
                 
-                f.Cm = -(Cp .* area .* nx) + (Cp .* area .* nz);
-                f.CN = -Cp .* area .* nz;
-                f.CA = -Cp .* area .* nx;
-                
                 if isempty(Cf)
                     f.Cd = f.Cdp;
+                    f.CA = -Cp .* area .* nx;
                 else
                     f.Cf = Cf .* area;
                     f.Cd = f.Cdp + f.Cf;
+                    f.CA = -(Cp + Cf) .* area .* nx;
                 end
+                
+                % f.Cm = -(Cp .* area .* nx) + (Cp .* area .* nz);
+                f.CN = -Cp .* area .* nz;
+                % f.CA = -Cp .* area .* nx;
+                f.Cm = f.CA - f.CN;
                 
                 %% Sum and normalise coefficients
                 fn = fieldnames(f);

@@ -1,10 +1,9 @@
-# Results Folder: Want to ensure all file types
-# are ignored
-
 # Things appearing in repo to ignore:
 *.mat
 *.asv
+*.csv
 *.fig
+*.eps
 *.png
 *.jpeg
 *.emp
@@ -12,6 +11,6 @@
 *.dat
 *.txt
 *.xlsx
-**/Results/
-**/External/
-**/Offpath/
+/Results/
+/External/
+/ProblemDefinitions/

@@ -23,7 +23,7 @@ if size(cost, 2) == 2
 else
     % Have to normalise cost in original dimension
     % normCost = (cost - min(cost))./(max(cost) - min(cost));
-    scatter3(cost(:,1), cost(:,2), cost(:,3), 10, normCost, 'filled')
+    scatter3(cost(:,1), cost(:,2), cost(:,3), 12, normCost, 'filled')
     zlabel(axisLabels{3}, 'Interpreter', 'latex')
 end
 

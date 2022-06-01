@@ -4,6 +4,7 @@ classdef Forces < Combinable
     
         L
         D
+        Df
         M
     end
     
@@ -17,6 +18,7 @@ classdef Forces < Combinable
                 
                 obj.L = 0.5 * rinf * (Uinf^2) * sum([fco.Cl]) * Aref;
                 obj.D = 0.5 * rinf * (Uinf^2) * sum([fco.Cd]) * Aref;
+                obj.Df = 0.5 * rinf * (Uinf^2) * sum([fco.Cf]) * Aref;
                 obj.M = 0.5 * rinf * (Uinf^2) * sum([fco.Cm]) * Aref;
             end
         end
