@@ -1,5 +1,5 @@
-function plotFormat(f, axesSpec, lineSpec)
-%PLOTFORMAT formats a given formats to the specifications below
+function plot_format(f, axesSpec, lineSpec)
+%PLOT_FORMAT formats a given formats to the specifications below
 %   Given a figure handle input, each axis, and each line within will be
 %   specified according to axesSpec and lineSpec respectively
 %   Inputs:

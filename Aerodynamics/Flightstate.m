@@ -7,8 +7,8 @@ classdef Flightstate
         altitude
         beta = 0
         delta
-        Machq
-        delq
+        Mach_q
+        delta_q
         Pr
         Uinf
         Tinf
@@ -19,8 +19,8 @@ classdef Flightstate
         Pinf
         q
         order (1,1) string {mustBeMember(order,{'full_fact', 'None'})} = 'full_fact'
-        maxBeta
-        maxDel
+        max_beta
+        max_delta
     end
     
     properties (Constant)
@@ -61,22 +61,22 @@ classdef Flightstate
                         obj(i).(fn{j}) = varargin{j}(states(i,j));
                     end
                     
-                    obj(i) = obj(i).init();
-                    obj(i) = obj(i).maxAngles(table);
+                    obj(i) = obj(i).get_atmospheric_values();
+                    obj(i) = obj(i).max_shock_angles(table);
                 end
             end
         end
         
-        function obj = init(obj)
+        function obj = get_atmospheric_values(obj)
                 
-            hvals = atmosphere(obj.altitude, 0, 0);
+            output = tewari_atmosphere(obj.altitude, 0, 0);
             
-            obj.Tinf = hvals(1); % Freestream temperature
-            obj.rinf = hvals(2); % Freestream density
-            obj.Pinf = hvals(7); % Freestream pressure
-            obj.a = hvals(5); % Speed of sound
-            obj.mu = hvals(8); % Dynamic viscosity
-            obj.kt = hvals(10); % Thermal conductivity
+            obj.Tinf = output(1); % Freestream temperature
+            obj.rinf = output(2); % Freestream density
+            obj.Pinf = output(7); % Freestream pressure
+            obj.a = output(5); % Speed of sound
+            obj.mu = output(8); % Dynamic viscosity
+            obj.kt = output(10); % Thermal conductivity
             
             g = obj.gamma;
             M = obj.Minf;
@@ -88,13 +88,13 @@ classdef Flightstate
             % Matching points for Newtonian + Prandtl-Meyer method
             % CHECK: reasonable results for all Mach numbers?
                 
-            [obj.delq, obj.Machq] = matching_point(g, Pinf_P0);
+            [obj.delta_q, obj.Mach_q] = matching_point(g, Pinf_P0);
             
             obj.Pr = obj.mu .* obj.cp./obj.kt; % Prandtl number
             obj.Uinf = M .* obj.a;
             obj.q = 0.5 * obj.rinf .* obj.Uinf.^2;
         end
-        function obj = maxAngles(obj, table)
+        function obj = max_shock_angles(obj, table)
             
             if nargin < 1
              
@@ -103,8 +103,8 @@ classdef Flightstate
             
             [~, angles] = halfspace(obj.Minf, table);
             
-            obj.maxDel = angles(:,1);
-            obj.maxBeta = angles(:,2);
+            obj.max_delta = angles(:,1);
+            obj.max_beta = angles(:,2);
         end
         function a = get.U(obj)
             

@@ -278,22 +278,22 @@ classdef Wingsection < Geometry
         end
         function obj = extendWithin(obj)
             % Method to extend wing through to root
-            obj.x(:,1) = twoPointInterp(obj.y(:,1:2), obj.x(:,1:2), 0);
-            obj.z(:,1) = twoPointInterp(obj.y(:,1:2), obj.z(:,1:2), 0);
+            obj.x(:,1) = two_point_interp(obj.y(:,1:2), obj.x(:,1:2), 0);
+            obj.z(:,1) = two_point_interp(obj.y(:,1:2), obj.z(:,1:2), 0);
             
-            obj.x(:,end) = twoPointInterp(obj.y(:,end-1:end), obj.x(:,end-1:end), 0);
-            obj.z(:,end) = twoPointInterp(obj.y(:,end-1:end), obj.z(:,end-1:end), 0);
+            obj.x(:,end) = two_point_interp(obj.y(:,end-1:end), obj.x(:,end-1:end), 0);
+            obj.z(:,end) = two_point_interp(obj.y(:,end-1:end), obj.z(:,end-1:end), 0);
             
             obj.y(:,1) = 0;
             obj.y(:,end) = 0;
             
             obj.chord(1) = diff(obj.x([1, end], 1));
             obj.span(1) = obj.y(1,2);
-%             x1 = twoPointInterp(obj.y(:,1:2), obj.x(:,1:2), 0);
-%             z1 = twoPointInterp(obj.y(:,1:2), obj.z(:,1:2), 0);
+%             x1 = two_point_interp(obj.y(:,1:2), obj.x(:,1:2), 0);
+%             z1 = two_point_interp(obj.y(:,1:2), obj.z(:,1:2), 0);
 %             
-%             xend = twoPointInterp(obj.y(:,end-1:end), obj.x(:,end-1:end), 0);
-%             zend = twoPointInterp(obj.y(:,end-1:end), obj.z(:,end-1:end), 0);
+%             xend = two_point_interp(obj.y(:,end-1:end), obj.x(:,end-1:end), 0);
+%             zend = two_point_interp(obj.y(:,end-1:end), obj.z(:,end-1:end), 0);
 %             
 %             y = zeros(size(x1));
 %             

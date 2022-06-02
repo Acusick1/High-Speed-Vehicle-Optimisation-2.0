@@ -380,7 +380,7 @@ classdef Aerofoil% < handle
                 end
             end
             
-            plotFormat()
+            plot_format()
             hold off
         end
     end
@@ -467,7 +467,7 @@ classdef Aerofoil% < handle
                     axis equal
                     xlabel('x')
                     ylabel('z')
-                    latexfigure()
+                    latex_figure()
                     hold off
                     k = k + 1;
                 end

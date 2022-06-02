@@ -294,7 +294,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
                     % colorbar
                 end
                 view(views(i,:))
-                plotFormat
+                plot_format
                 box off
                 % axis equal tight off
                 axis equal tight
@@ -409,7 +409,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             xlabel('x, m', 'Interpreter', 'latex')
             ylabel('y, m', 'Interpreter', 'latex')
             zlabel('z, m', 'Interpreter', 'latex')
-            plotFormat([], [], {'LineWidth', 0.5})
+            plot_format([], [], {'LineWidth', 0.5})
             axis equal tight
             hold off
         end

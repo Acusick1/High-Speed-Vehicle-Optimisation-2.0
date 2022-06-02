@@ -7,13 +7,13 @@ if nargin < 3, g = 1.4; end
 theta = atan(2 * cot(beta) .* ((mach.^2 .* (sin(beta).^2)-1) ./ ...
     (mach.^2 .* (g + cos(2 * beta)) + 2)));
 
-[maxTheta, id] = max(theta, [], 1);
-maxBeta = beta(id);
+[max_theta, id] = max(theta, [], 1);
+max_beta = beta(id);
 beta = [NaN; beta];
 theta_mach = [mach; theta]; 
 theta_beta_mach = [beta, theta_mach];
 
-max_theta_beta_mach = [mach' maxTheta' maxBeta];
+max_theta_beta_mach = [mach' max_theta' max_beta];
 
 % figure
 % hold on
@@ -24,4 +24,4 @@ max_theta_beta_mach = [mach' maxTheta' maxBeta];
 % axis([0 45 0 90])
 % hold off
 
-% save('thetaBetaCurves','thetaBetaM','maxThetaBetaM')
+% save('thetaBetaCurves','thetaBetaM','max_thetaBetaM')

@@ -27,7 +27,7 @@ classdef Viscous
         
         Twall
         qwall
-        maxTwall
+        max_Twall
         cf
     end
     
@@ -52,7 +52,7 @@ classdef Viscous
     end
     
     methods
-        function obj = test(obj, Rn)
+        function obj = test(obj)
             
             dim = size(obj.Tedge);
             
@@ -81,7 +81,7 @@ classdef Viscous
                 obj.rho(set) = min(obj.rho(~set));
             end
             
-            %[obj.cf, q, obj.Re] = obj.eckert(Tw);
+            % [obj.cf, q, obj.Re] = obj.eckert(Tw);
             
             for i = 1:maxIt
                 %% TODO: Comapred to DiGiorgio2019, commenting out gives closer result, cold wall assumption?
@@ -127,7 +127,7 @@ classdef Viscous
             end
             
             obj.qwall = q;
-            obj.maxTwall = max(Tw(:));
+            obj.max_Twall = max(Tw(:));
         end
         function [cf_star, q, Re_star_x] = eckert(obj, Tw)
             

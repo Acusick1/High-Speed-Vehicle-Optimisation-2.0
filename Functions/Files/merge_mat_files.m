@@ -1,5 +1,5 @@
-function mergeMatFiles(folder, inFile, fields, outFile)
-%MERGEMATFILES loads all mat files in path and concatenates them
+function merge_mat_files(folder, inFile, fields, outFile)
+%MERGE_MAT_FILES loads all mat files in path and concatenates them
 %   folder: path to load files from (default = pwd)
 %   fields: specific fields to merge, cell array of strings (default = all)
 

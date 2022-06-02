@@ -1,4 +1,4 @@
-function Y = tewariAtmosphere(h, vel, CL)
+function Y = tewari_atmosphere(h, vel, CL)
 %(c) 2005 Ashish Tewari
 R = 287; %sea-level gas constant for air (J/kg.K)
 go = 9.806; %sea level acceleration due to gravity (m/s^2)
