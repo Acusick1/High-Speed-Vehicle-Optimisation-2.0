@@ -1,4 +1,6 @@
 function [bool, code] = on_line_segment(p1, p2, p)
+%ON_LINE_SEGMENT determine whether a given point p lies on line specified
+%by p1 and p2, vectorised for multiple line segments
 
 [dim, ~] = size(p);
 bool = true(dim, 1);

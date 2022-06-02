@@ -1,4 +1,5 @@
 function within = is_within_triangle(P, P1, P2, P3)
+%IS_WITHIN_TRIANGLE whether point P lies within triangle
 
 % P: point
 % c: corners of triangle, each column containing x, y, z coords

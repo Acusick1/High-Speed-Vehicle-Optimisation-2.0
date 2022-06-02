@@ -415,7 +415,7 @@ z = surface.z;
 
 for i = 2:-1:1
     
-    [~, xexit(:,i), yexit(:,i)] = is_within_polygon(x(:,1), z(:,[1 end]), lines(:,i,1), lines(:,i,3));
+    [~, xexit(:,i), yexit(:,i)] = is_within_parallelogram(x(:,1), z(:,[1 end]), lines(:,i,1), lines(:,i,3));
 end
 
 xout = diff(xexit, [], 2) == 0;
@@ -515,7 +515,7 @@ seg_id = c;
             u = p1 - p2;
             
             % Get intersection point
-            I = new_line_plane_intersection(u', p1', n, M);
+            I = line_plane_intersection_simple(u', p1', n, M);
             I = I(hack, :);
             
             inTri = iswithintriangle(I);

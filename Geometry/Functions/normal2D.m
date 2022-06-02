@@ -1,30 +1,26 @@
-function [nx,ny] = normal2D(x,y,dim,invert)
-%% Calculate two dimensional unit normal vector
-% Input of vector containing x and y coordinates of a single line
-% Optional third component to define which dimension normal is to be
-% calculated 
-% Optional fourth component allows inverted normal to be computed
+function [nx,ny] = normal2D(x, y, dim, invert)
+%NORMAL2D Calculate two dimensional unit normal vector
+%   Input:
+%   x, y - x and y coordinates of a single line
+% 	dim - which dimension normal is to be calculated (default = 1)
+%   invert - compute inverted normal
 
-if nargin < 3
+if nargin < 3 || isempty(dim)
     
     dim = 1;
     
     if all(size(x) > 1)
     
-        error('Supply matrix dimension in which normal is to be calculated')
+        error('Matrix input without dimension in which to calulcate normal')
     end
 end
-    
-if nargin < 4
-    
-    invert = false;
-end 
+
+if nargin < 4 || isempty(invert), invert = false; end 
 
 % Calculate vector components of each line segment
-diffx = diff(x,[],dim);
-diffy = diff(y,[],dim);
+diffx = diff(x, [], dim);
+diffy = diff(y, [], dim);
     
-
 % Calculate normal components
 if invert
     
@@ -41,7 +37,6 @@ nx = nx./mag;
 ny = ny./mag;
 
 %% Proof
-
 % xc = (x(1:end-1) + x(2:end))/2;
 % yc = (y(1:end-1) + y(2:end))/2;
 % 
