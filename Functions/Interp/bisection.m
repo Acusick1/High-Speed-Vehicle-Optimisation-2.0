@@ -1,6 +1,4 @@
 function [x, fx, exitFlag] = bisection(f,lb,ub,target,options)
-% COMMENT: Seems to need column vector? Not row? (lb was single value
-% though).
 % BISECTION Fast and robust root-finding method that handles n-dim arrays.
 % 
 %   [x,fVal,ExitFlag] = BISECTION(f,LB,UB,target,options) finds x +/- TolX

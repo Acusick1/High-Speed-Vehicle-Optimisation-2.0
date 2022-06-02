@@ -1,33 +1,41 @@
-function merge_mat_files(folder, inFile, fields, outFile)
-%MERGE_MAT_FILES loads all mat files in path and concatenates them
-%   folder: path to load files from (default = pwd)
-%   fields: specific fields to merge, cell array of strings (default = all)
+function merge_mat_files(folder, file_pattern, fields, output_filename)
+%MERGE_MAT_FILES loads mat files and concatenates them.
+%   Inputs:
+%   folder - path to load files from (default = pwd)
+%   file_pattern - pattern to load mat files (default = all files)
+%   fields - specific fields to merge, cell array of strings 
+%       (default = all)
+%   output_filename - filename of merged file
 
 if nargin < 1 || isempty(folder), folder = pwd; end
-if nargin < 2 || isempty(inFile), inFile = '*'; end
+if nargin < 2 || isempty(file_pattern), file_pattern = '*'; end
 
-FileList = dir(fullfile(folder, [inFile '.mat']));  % List of all MAT files
+% List of all MAT files
+file_list = dir(fullfile(folder, [file_pattern '.mat']));
 
 if nargin < 3 || isempty(fields)
     
-    temp = load(fullfile(folder, FileList(1).name));
+    temp = load(fullfile(folder, file_list(1).name));
     fields = fieldnames(temp);
 end
 
-allData = struct();
-for iFile = 1:numel(FileList)              % Loop over found files
+concat_data = struct();
+for i = 1:numel(file_list) % Loop over found files
     
-    data = load(fullfile(FileList(iFile).folder, FileList(iFile).name), fields{:});
+    filename = fullfile(file_list(i).folder, file_list(i).name);
+    data = load(filename, fields{:});
     
-    for iField = 1:numel(fields)              % Loop over fields of current file
+    % Loop over fields of current file
+    for j = 1:numel(fields)
         
-        aField = fields{iField};
+        field = fields{j};
         
-        if isfield(allData, aField)             % Attach new data:
+        % Attach new data
+        if isfield(concat_data, field)
             
-            allData.(aField) = [allData.(aField); data.(aField)];
+            concat_data.(field) = [concat_data.(field); data.(field)];
         else
-            allData.(aField) = data.(aField);
+            concat_data.(field) = data.(field);
         end
     end
 end
@@ -38,5 +46,6 @@ while contains(folder, '*')
     [folder, ~] = fileparts(folder);
 end
 
-allData.filenames = {FileList.name}';
-save(fullfile(folder, outFile), '-struct', 'allData');
+% Saving list of merged files
+concat_data.filenames = {file_list.name}';
+save(fullfile(folder, output_filename), '-struct', 'concat_data');

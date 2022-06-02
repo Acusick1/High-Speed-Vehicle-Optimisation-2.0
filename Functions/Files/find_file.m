@@ -1,26 +1,33 @@
-function [path, num, counter] = find_file(str, searchPath)
-%% Find file in directory containing specified string or pattern
+function [path, counter] = find_file(filepattern, search_path)
+%FIND_FILE searches for specified file/directory string pattern within 
+%directory provided.
+%   Inputs:
+%   filepattern - String with file/directory name or partial name
+%   search_path - Directory to search within 
+%       (default = current directoy)
+%
+%   Outputs:
+%   path - path to last file/directory matching filepattern
+%   counter - number of matches found, useful for ensuring file/directory
+%   names are unique.
 
-if nargin < 2
-    
-    searchPath = pwd;
-end
+if nargin < 2, search_path = pwd; end
 
 name = [];
-num = nan;
 counter = 1;
 
-folderData = struct2cell(dir(searchPath));
-dirNames = folderData(1,:);
+% Collecting names
+folder_data = struct2cell(dir(search_path));
+names = folder_data(1,:);
 
-for i = 1:length(dirNames)
+% Loop through names to find matches
+for i = 1:length(names)
     
-    if contains(dirNames(i), str)
+    if contains(names(i), filepattern)
         
-        name = dirNames{i};
-        num = i;
+        name = names{i};
         counter = counter + 1;
     end
 end
 
-path = fullfile(searchPath, name);
+path = fullfile(search_path, name);
