@@ -1,23 +1,23 @@
-function [matchdel,matchMach] = matching_point(gamma,Pinf_P0)
-%% Matching point calculation
-% Find point (inclination angle and Mach number) at which Prandtl-Meyer and
-% Newtonian calculated pressures are equal
+function [match_del, match_mach] = matching_point(gamma, Pinf_P0)
+%MATCHING_POINT calculates point to switch from Newtonian to Prandtl-Meyer
+%   Find point (inclination angle and Mach number) at which Prandtl-Meyer 
+%   and Newtonian calculated pressures are equal
 
-fun = @(Mq,gamma)(((2./(2+(gamma-1).*(Mq.^2))).^(gamma/(gamma-1)))...
+fun = @(Mq, gamma)(((2./(2+(gamma-1).*(Mq.^2))).^(gamma/(gamma-1)))...
     .*(1-(((gamma^2).*(Mq.^4).*((2./(2+(gamma-1).*(Mq.^2))).^(gamma/(gamma-1))))...
     ./(4*((Mq.^2)-1).*(1-((2./(2+(gamma-1).*(Mq.^2))).^(gamma/(gamma-1))))))));
 
-fun2 = @(Mq) fun(Mq,gamma);
+wrapper_fun = @(Mq) fun(Mq, gamma);
 
-[M,~,flag] = bisection(fun2,1.1,1.75,Pinf_P0);
+M = bisection(wrapper_fun, 1.1 , 1.75, Pinf_P0);
 
 Q = ((2./(2+(gamma-1).*(M.^2))).^(gamma/(gamma-1)));
 P = Q.*(1-(((gamma^2).*(M.^4).*Q)./(4*((M.^2)-1).*(1-Q))));
 
-matchMach = M;
-matchdel = asin(((Q-P)/(1-P))^0.5);
+match_mach = M;
+match_del = asin(((Q-P)/(1-P))^0.5);
 
-%% OLD METHOD
+%% OLD METHOD from super-hypersonic arbitrary-body program 1970
 % % Initial guesses
 % Mq = [1.35,1.75];
 % Q = ((2./(2+(gamma-1).*(Mq.^2))).^(gamma/(gamma-1)));

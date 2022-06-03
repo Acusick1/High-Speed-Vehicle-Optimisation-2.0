@@ -1,5 +1,6 @@
 function table = prandtl_meyer_table(g)
-    
+%PRANDTL_MEYER_TABLE Generate Prandtl-Meyer table
+
 M = [1:0.0001:100, 100.01:0.01:500];
 
 M1 = M(:);

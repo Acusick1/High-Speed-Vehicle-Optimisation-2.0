@@ -70,9 +70,9 @@ classdef Aerodynamics
         end
         function obj = set_flow(obj, state)
             
-            g = state.gamma;
-            obj.cone_table = tangent_cone_table(state.Minf, g);
-            obj.vmax = pi/2 * (((g + 1)/(g - 1))^0.5 - 1);
+            gamma = state.gamma;
+            obj.cone_table = tangent_cone_table(state.Minf, gamma);
+            obj.vmax = pi/2 * (((gamma + 1)/(gamma - 1))^0.5 - 1);
             obj.flow = state;
         end
         function obj = analyse(obj, varargin)
@@ -506,8 +506,8 @@ classdef Aerodynamics
             % denom = 1 + ((gamma-1)/2) * (Minf^2) * ((sin(tau).^2) - 2*((tau-theta).^2) .* (cos(theta).^2));
             % M = (numer./denom).^0.5;
             
-            [~, M] = halfspace(tau, obj.cone_table);
-            M(M > M1) = M1;
+            [~, M2] = halfspace(tau, obj.cone_table);
+            M2(M2 > M1) = M1;
             
             %% TODO: Using Kbeta instead of K?
             % Anderson2006 p143
@@ -524,7 +524,7 @@ classdef Aerodynamics
             % Anderson2006 p38
             rratio = ((g + 1) * (Mn1.^2))./(2 + (g - 1) * (Mn1.^2));
             
-            obj.Medge(con) = M;
+            obj.Medge(con) = M2;
             obj.Cp(con) = sin(theta.^2) .* (1 + (frac1 .* log(frac2)));
             obj.Pedge(con) = Pratio * obj.flow.Pinf;
             obj.rho(con) = rratio * obj.flow.rinf;
