@@ -6,7 +6,7 @@ classdef Optimisation
         ub
         nVar
         nFun = 1
-        maxIt = 200
+        max_it = 200
         cost_fun
         vio_fun
         it
@@ -60,7 +60,7 @@ classdef Optimisation
                 
                 a = [];
             else
-                a = 0:ceil(obj.maxIt/10):obj.maxIt;
+                a = 0:ceil(obj.max_it/10):obj.max_it;
             end
         end
         function save_opt(obj, it)

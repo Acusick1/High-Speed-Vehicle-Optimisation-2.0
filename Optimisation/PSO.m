@@ -22,7 +22,15 @@ classdef PSO < GlobalOptimisation
     end
     
     methods
-        function obj = PSO(lb, ub, nPop, cost_fun, vio_fun, nFun, maxIt)
+        function obj = PSO(lb, ub, nPop, cost_fun, vio_fun, nFun, max_it)
+            %PSO initialisation
+            %   Inputs:
+            %   lb, ub - lower and upper boundaries of variables
+            %   nPop - number of particles in swarm
+            %   cost_fun - handle to cost function
+            %   vio_fun - handle to violation funciton
+            %   nFun - number of cost functions to optimise
+            %   max_it - maximum number of iterations
             
             obj.lb = lb(:)';
             obj.ub = ub(:)';
@@ -31,6 +39,7 @@ classdef PSO < GlobalOptimisation
             obj.nPop = nPop;
             obj.cost_fun = cost_fun;
             
+            %% TODO: Why is this being repeated for every particle? Should be single function like cost_fun
             if nargin >= 5 && ~isempty(vio_fun)
                 
                 if isobject(vio_fun)
@@ -40,13 +49,15 @@ classdef PSO < GlobalOptimisation
                     obj.vio_fun = vio_fun;
                 end
             end
+            
             if nargin >= 6 && ~isempty(nFun), obj.nFun = nFun; end
-            if nargin >= 7 && ~isempty(maxIt), obj.maxIt = maxIt; end
+            if nargin >= 7 && ~isempty(max_it), obj.max_it = max_it; end
             
             obj.var_size = [obj.nPop, obj.nVar];
             obj.par_vel = zeros(obj.var_size);
             obj.penalty = zeros(obj.nPop, 1);
         end
+        
         function obj = update_cost(obj, i)
             %% TODO: Hacky
             % Allows combined cost/vio functions to be used (default) along
@@ -184,7 +195,7 @@ classdef PSO < GlobalOptimisation
             [a.best, a.gBest] = ...
                 design.from_struct(obj.best, obj.gBest);
         end
-        function obj = main_simp(obj)
+        function obj = run_simple(obj)
             
             [obj.variables, obj.best.variables] = ...
                 deal(obj.init_lhs(obj.nPop));
@@ -199,7 +210,7 @@ classdef PSO < GlobalOptimisation
             
             wc = 0;
             
-            for i = 2:obj.maxIt + 1
+            for i = 2:obj.max_it + 1
                 
                 obj = obj.update_position();
                 obj = obj.update_cost(i-1);
@@ -227,15 +238,21 @@ classdef PSO < GlobalOptimisation
                 end
             end
         end
-        function obj = main(obj)
+        function obj = run(obj)
+            %RUN particle swarm optimisation
             
-            [obj.variables, obj.best.variables] = ...
-                deal(obj.init_lhs(obj.nPop));
+            % Initialise particle variables and particle best variables
+            % using Latin hypercube sampling
+            obj.variables = obj.init_lhs(obj.nPop);
+            obj.best.variables = obj.variables;
             
+            % Initialise mutation subset indices
             sets = obj.subset(3);
             
+            % Initialise particle neighbourhood indices 
             hood = obj.single_link_neighbour(obj.nPop, 4);
             
+            % Initial PSO loop
             obj = obj.update_cost(0);
             obj = obj.init_best();
             obj = obj.update_gBest();
@@ -245,7 +262,7 @@ classdef PSO < GlobalOptimisation
             
             wc = 0;
             
-            for i = 2:obj.maxIt + 1
+            for i = 2:obj.max_it + 1
                 
                 tic
                 % Find best fitness/violation value in neighbourhood
@@ -277,7 +294,7 @@ classdef PSO < GlobalOptimisation
                 
                     obj.save_opt(i-1);
                     % Resetting parpool to avoid OOM errors
-                    if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
+                    if ~isempty(gcp('nocreate')) && obj.max_it >= 500
                         
                         delete(gcp); 
                     end
@@ -315,7 +332,7 @@ classdef PSO < GlobalOptimisation
             lb = zeros(n, 1) - 10e9;
             ub = zeros(n, 1) + 10e9;
             obj = PSO(lb, ub, nPop, cost_fun);
-            obj = obj.main();
+            obj = obj.run();
         end
         function obj = test_constrained()
             %% Rosenbrock function constrained with a cubic and a line
@@ -326,7 +343,7 @@ classdef PSO < GlobalOptimisation
             lb = [-1.5 -0.5];
             ub = [1.5 2.5];
             obj = PSO(lb, ub, nPop, cost_fun, vio_fun);
-            obj = obj.main_test();
+            obj = obj.run();
         end
         function hood = single_link_neighbour(nPop, N)
             %% Create singly-linked neighbourhoods

@@ -1,4 +1,4 @@
-function [nx,ny] = normal2D(x, y, dim, invert)
+function [nx, ny] = normal2D(x, y, dim, invert)
 %NORMAL2D Calculate two dimensional unit normal vector
 %   Input:
 %   x, y - x and y coordinates of a single line

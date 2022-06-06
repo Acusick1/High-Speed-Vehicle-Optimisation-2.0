@@ -128,7 +128,7 @@ classdef MFPSO < PSO
             
             wc = 0;
             
-            for i = 2:obj.maxIt + 1
+            for i = 2:obj.max_it + 1
                 
                 tic
                 % Find best fitness/violation value in neighbourhood
@@ -161,7 +161,7 @@ classdef MFPSO < PSO
                 
                     obj.save_opt(i-1);
                     % Resetting parpool to avoid OOM errors
-                    if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
+                    if ~isempty(gcp('nocreate')) && obj.max_it >= 500
                         
                         delete(gcp); 
                     end

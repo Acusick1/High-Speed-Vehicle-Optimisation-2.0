@@ -5,7 +5,7 @@ classdef Wingsection < Geometry
         chord
         span
         trail_sweep
-        sections = Aerofoil.getaerofoil("NACA0006")
+        sections = Aerofoil.get_aerofoil("NACA0006")
         dihedral
         offset = [0 0]
     end

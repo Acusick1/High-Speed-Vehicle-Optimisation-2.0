@@ -1,47 +1,49 @@
-classdef Aerofoil% < handle
+classdef Aerofoil
     
     properties
         
-        rescale = false
+        % Upper and lower aerofoil surface x and z coordinates
         xu = (0:0.01:1)'
         xl = (0:0.01:1)'
-%         xu = 0.5*(1-cos(((0:0.01:1)*pi)))'
-%         xl = 0.5*(1-cos(((0:0.01:1)*pi)))'
-        conical = false
-        checks
-    end
-    
-    properties %(SetObservable)
-        
+        % xu = 0.5*(1-cos(((0:0.01:1)*pi)))'
+        % xl = 0.5*(1-cos(((0:0.01:1)*pi)))'
         zu
         zl
+        % Interpolate input aerofoil coordinates to x values above
+        rescale = false 
+        conical = false         % 2D shape
+        checks                  % Geometric violation parameters
     end
     
     properties (Dependent)
         
         data
+        % Wrapped aerofoil coordinates from trailing edge to trailing edge
         coords
-        area
-        thickness
-        camber
-        lead_edge
+        area                    % Area of each 2D "panel"
+        thickness               % Thickness of aerofoil at every x
+        camber                  % Camber line of aerofoil
+        lead_edge               
         trail_edge
     end
     
     properties (Constant)
         
-        xLEr = 0.01
-        % Minimum allowable thickness
-        minThick = 1e-8;
-        % Percentage of chord near LE/TE to remove from min thickness fixing
-        edge = 0.05;
-        maxTE = 0.05;
+        xLEr = 0.01             % Leading edge radius defined at 1% chord
+        min_thickness = 1e-8;   % Minimum allowable thickness
     end
     
     methods
         function obj = Aerofoil(varargin)
+            %AEROFOIL initialisation function
+            %   Input options:
+            %       Aerofoil(coords)
+            %       Aerofoil(coords, rescale)
+            %       Aerofoil(zu, zl)
+            %       Aerofoil(zu, zl, xu, xl)
+            %       Aerofoil(zu, zl, xu, xl, rescale)
             
-            if nargin >= 1
+            if nargin > 0
                 if nargin == 1
                     
                     coords = varargin{:};
@@ -67,44 +69,53 @@ classdef Aerofoil% < handle
                 
                 if isempty(obj.zu)
                         
-                    obj = obj.coordstoxz(coords);
+                    obj = obj.coords2xz(coords);
                 end
             end
-            
-            % addlistener(obj, 'zl', 'PostSet', @obj.check);
         end
         function data = get.data(obj)
+            %% TODO: Should this be get function or just carried out during initialisation?
+            %GETDATA calculates important aerofoil attributes from aerofoil
+            %coordinates
             
-            upNorm = Aerofoil.normal([obj.xu obj.zu]);
-            loNorm = -Aerofoil.normal([obj.xl obj.zl]);
+            % Calculate outward facing normals on upper and lower surfaces
+            [nx_upper, nz_upper] = normal2D(obj.xu, obj.zu);
+            [nx_lower, nz_lower] = normal2D(obj.xl, obj.zl);
             
-            norm(:,:,1) = [upNorm(:,1) loNorm(:,1)];
-            norm(:,:,3) = [upNorm(:,2) loNorm(:,2)];
+            normal(:,:,1) = [nx_upper nx_lower];
+            normal(:,:,3) = [nz_upper nz_lower];
             
-            mag_norm = magmat(norm);
-            unit_norm = norm./mag_norm;
-            points = reshape([obj.xu obj.xl obj.zu obj.zl], [], 2, 2);
-            mag = magmat(diff(points, 1, 1));
+            % Normalise normals to unit normals
+            mag_norm = magmat(normal);
+            unit_norm = normal./mag_norm;
+            
+            points(:,:,1) = [obj.xu obj.xl];
+            points(:,:,2) = [obj.zu obj.zl];
+            
+            % "area" of line segment = length of line segment
+            line_area = magmat(diff(points, 1, 1));
+            
+            % Get centre point of each line segment
             centre = (points(1:end-1,:,:) + points(2:end,:,:))/2;
             
-            data.norm = norm;
+            data.norm = normal;
             data.mag = mag_norm;
             data.unit_norm = unit_norm;
-            data.area = mag;
+            data.area = line_area;
             data.centre = centre;
         end
-        function obj = coordstoxz(obj, coords)
+        function obj = coords2xz(obj, coords)
+            %COORDS2XZ sets upper and lower leading to trailing edge
+            %coordinates from input wrapped coordinates
+            %   Inputs:
+            %   coords - wrapped aerofoil coordinates with start/end points 
+            %      at trailing edge
             
-            dim = ceil(length(coords)/2);
+            nPoints = ceil(length(coords)/2);
             % Split into upper and lower, ensure no repeating points
-            upper = unique(coords(1:dim, :), 'rows');
-            lower = unique(coords(dim:end, :), 'rows');
+            upper = unique(coords(1:nPoints, :), 'rows');
+            lower = unique(coords(nPoints:end, :), 'rows');
             
-            %% Test > compare with aerofoilProperties hack
-            upper([1 end], 1) = [0 1];
-            lower([1 end], 1) = [0 1];
-            
-            %%
             if obj.rescale
                 
                 obj.xu = upper(:, 1);
@@ -125,6 +136,10 @@ classdef Aerofoil% < handle
             end
         end
         function obj = redist(obj, x)
+            %REDIST redistributes current aerofoil by input x values
+            %   Inputs:
+            %   x - non-dimensionalised array of increasing x values from 0
+            %       to 1
             
             x = x(:);
             
@@ -136,22 +151,30 @@ classdef Aerofoil% < handle
             obj.zl = zlo;
         end
         function obj = nondim(obj)
-            %% TODO: nondim in x, translate in x and z
-            minx = min(obj.coords(:,1));
-            maxx = max(obj.coords(:,1));
+            %NONDIM translate and rescale aerofoil coordinates to
+            %non-dimensionalised coordinates with a chord 0 to 1
             
-            % Ensure non-dimensionalised
-            obj.coords(:,1) = obj.coords(:,1) - minx;
-            obj.coords = obj.coords/(maxx - minx);
+            % Translate x and z coordinates by leading edge value
+            [~, lead_edge_id] = min(obj.coords(:,1));
+            obj.coords = obj.coords - obj.coords(lead_edge_id,:);
+            
+            % Leading edge now [0, 0], so divide by maximum chord value
+            % (trailing edge x) in both x and z to non-dimensionalise
+            [~, trail_edge_id] = max(obj.coords(:,1));
+            obj.coords = obj.coords/obj.coords(trail_edge_id, 1);
         end
-        function obj = dimensionalise(obj, c)
+        function obj = dimensionalise(obj, chord)
+            %DIMENSIONALISE transforms non-dimensionalised aerofoil 
+            %coordinates by input scalar chord
             
-            obj.xu = obj.xu .* c;
-            obj.xl = obj.xl .* c;
-            obj.zu = obj.zu .* c;
-            obj.zl = obj.zl .* c;
+            obj.xu = obj.xu * chord;
+            obj.xl = obj.xl * chord;
+            obj.zu = obj.zu * chord;
+            obj.zl = obj.zl * chord;
         end
         function obj = offset(obj, x, z)
+            %OFFSET traslates non-dimensional aerofoil chord by input 
+            %x and z scalar values
             
             if nargin >= 2 && ~isempty(x)
                 
@@ -165,6 +188,11 @@ classdef Aerofoil% < handle
             end
         end
         function out = interp(obj, x, y, xq, varargin)
+            %INTERP aerofoil specific interpolation function
+            %   wrapper function of interp1 which requires unique points,
+            %   not guaranteed in aerofoil generation
+            %   
+            %   Inputs: equivalent to interp1 function
             
             if nargin < 3 || isempty(y)
                 
@@ -185,37 +213,32 @@ classdef Aerofoil% < handle
                 out = interp1(x, y, xq, varargin{:});
             end
         end
-        function obj = closeTrailEdge(obj)
-            
+        function obj = close_trail_edge(obj)
+            %CLOSE_TRAIL_EDGE transforms finite thickness trailing edge to
+            %point
             mid = (obj.zu(end) + obj.zl(end))/2;
             obj.zu(end) = mid;
             obj.zl(end) = mid;
         end
-        function a = get.coords(obj)
-            
-            % 2:end avoids two leading edge points
-            a = [flipud([obj.xu, obj.zu]);
-                obj.xl(2:end), obj.zl(2:end)];
-        end
-        function a = check(obj, varargin)
-            
+        function params = check(obj, varargin)
+            %% TODO: does this need varargin or only for handle implementation?
             % varargin only here for event args or id
             
             [du_f, du_f2, ~, uMaxLoc] = obj.check_curve("upper");
             % [a(3), ~, ~, a(4)] = obj.check_curve("lower");
             [dt_f, ~, dt_r, tMaxLoc, tMax] = obj.check_curve("thickness");
-            [~, tMin] = obj.check_thickness();
+            [~, tMin] = obj.constrain_thickness();
             LE = obj.lead_edge;
             LE = LE.radius;
             %a(12) = obj.thickness(end);
             
-            a = [du_f, uMaxLoc, dt_f, dt_r, tMaxLoc, tMax, tMin, LE(1), ...
-                LE(2), du_f2];
+            params = [du_f, uMaxLoc, dt_f, dt_r, tMaxLoc, tMax, tMin, ...
+                LE(1), LE(2), du_f2];
             
             if ~isempty(varargin) && isnumeric(varargin{1})
                 
                 id = varargin{1}; 
-                a = a(id);
+                params = params(id);
             end
         end
         function [d_f, d_f2, d_r, cLoc, Max] = check_curve(obj, which)
@@ -271,72 +294,86 @@ classdef Aerofoil% < handle
             
             if which == "lower", d_f = -d_f; d_r = -d_r; end
         end
-        function [obj, tMin] = check_thickness(obj)
+        function [obj, min_thick] = constrain_thickness(obj)
+            %CONSTRAIN_THICKNESS ensures aerofoil thickness is greater than
+            %min_thickness
             
-            c = obj.camber;
-            t = obj.thickness;
+            % Alter aerofoil if any thickness is < 0 or less than minimum 
+            % thickness outside of leading and trailing edges
+            inner = obj.camber(:,1) > 0 & obj.camber(:,1) < 1;
             
-            % Alter aerofoil if any thickness is < 0 or less than minimum thickness
-            % outside of leading and trailing edges
-            inner = c(:,1) > 0 & c(:,1) < 1;
-            tFix = (t < obj.minThick & inner) | t < 0;
-
-            obj = obj.fix_thickness(tFix);
-
-            tMin = min(t(inner));
+            fix_thickness = ...
+                (obj.thickness < obj.min_thickness & inner) | ...
+                obj.thickness < 0;
+            
+            if any(fix_thickness)
+                obj = obj.fix_thickness(fix_thickness);
+            end
+            
+            % Return minimum thickess of constrained aerofoil
+            min_thick = min(obj.thickness(inner));
         end
-        function obj = fix_thickness(obj, con)
+        function obj = fix_thickness(obj, fix)
+            %FIX_THICKNESS sets aerofoil thickness less than min_thickness
+            %to min_thickness
+            %   Inputs:
+            %   fix - logical array representing points that are below 
+            %       min_thickness 
             
-            c = obj.camber;
-            n = obj.normal(c);
+            [nx, nz] = normal2D(obj.camber(:,1), obj.camber(:,2));
+            % Taking central difference since normal outputs n-1 elements
+            c = (obj.camber(1:end-1,:) + obj.camber(2:end,:))/2;
             
             % Resetting thickness to min value perpendicular to camber line
-            t = obj.minThick/2;
+            t = obj.min_thickness/2;
             
-            cc = (c(1:end-1,:) + c(2:end,:))/2;
-            cc = c;
-            
-            xu_int = cc(:,1) + t .* n(:,1);
-            zu_int = cc(:,2) + t .* n(:,2);
-            xl_int = cc(:,1) - t .* n(:,1);
-            zl_int = cc(:,2) - t .* n(:,2);
+            xu_int = c(:,1) + t .* nx;
+            zu_int = c(:,2) + t .* nz;
+            xl_int = c(:,1) - t .* nx;
+            zl_int = c(:,2) - t .* nz;
             
             % Thickness applied in direction of camber, thus need to
             % interpolate back to orginal xu, xl locations
-            obj.zu(con) = interp1(xu_int, zu_int, obj.xu(con), 'linear', 'extrap');
-            obj.zl(con) = interp1(xl_int, zl_int, obj.xl(con), 'linear', 'extrap');
+            obj.zu(fix) = interp1(xu_int, zu_int, obj.xu(fix), 'linear', 'extrap');
+            obj.zl(fix) = interp1(xl_int, zl_int, obj.xl(fix), 'linear', 'extrap');
         end
-        function a = get.area(obj)
+        function coords = get.coords(obj)
             
-            a = trapz((obj.xu + obj.xl)/2, obj.zu - obj.zl);
+            % 2:end avoids two leading edge points
+            coords = [flipud([obj.xu, obj.zu]);
+                      obj.xl(2:end), obj.zl(2:end)];
         end
-        function a = get.thickness(obj)
+        function area = get.area(obj)
             
-            a = obj.zu - obj.zl;
+            area = trapz((obj.xu + obj.xl)/2, obj.zu - obj.zl);
         end
-        function a = get.camber(obj)
+        function thickness = get.thickness(obj)
             
-            a(:,1) = (obj.xu + obj.xl)/2;
-            a(:,2) = (obj.zu + obj.zl)/2;
+            thickness = obj.zu - obj.zl;
         end
-        function a = get.lead_edge(obj)
+        function camber = get.camber(obj)
+            
+            camber(:,1) = (obj.xu + obj.xl)/2;
+            camber(:,2) = (obj.zu + obj.zl)/2;
+        end
+        function lead_edge = get.lead_edge(obj)
             
             % Derive leading edge radius, defined at 1% of chord
             zu001 = interp1(obj.xu, obj.zu, obj.xLEr, 'pchip');
             zl001 = interp1(obj.xl, obj.zl, obj.xLEr, 'pchip');
             
-            a.radius = [zu001; -zl001];
-            a.thickness = (zu001 - zl001)/2;
+            lead_edge.radius = [zu001; -zl001];
+            lead_edge.thickness = (zu001 - zl001)/2;
         end
-        function a = get.trail_edge(obj)
+        function trail_edge = get.trail_edge(obj)
             
-            a = obj.zu(end,:) - obj.zl(end,:);
+            trail_edge = obj.zu(end,:) - obj.zl(end,:);
         end
-        function plot(obj, figNum)
+        function plot(obj, fig_num)
+            %% TODO: Still relevant? Only has BezierFoil option
+            if nargin >= 2 && isnumeric(fig_num)
             
-            if nargin >= 2 && isnumeric(figNum)
-            
-                f = figure(figNum);
+                f = figure(fig_num);
             else
                 f = figure;
             end
@@ -386,48 +423,45 @@ classdef Aerofoil% < handle
     end
     
     methods (Static)
-        function [aerofoil, file_names] = getaerofoil(names, path, id)
+        function [aerofoil, file_names] = get_aerofoil(pattern, path)
+            %GET_AEROFOIL loads aerofoil data to consistent format
+            %   Creates Aerofoil objects from data files
+            %
+            %   Inputs:
+            %   pattern - filename of aerofoil dat file, or pattern to load
+            %       multiple aerofoils (default = all dat files), string or
+            %       cell arrays of characters also allowed
+            %   path - path to directory containing data files
+            %       (default = "BasePath/Geometry/DataFiles")
             
-            if nargin < 1 || isempty(names)
+            if nargin < 1 || isempty(pattern)
                 
-                names = '.dat';
+                pattern = '.dat';
             end
             if nargin < 2 || isempty(path)
                 
-                path = fullfile(pwd, 'Geometry', 'DataFiles');
+                path = fullfile(get_base_path(), 'Geometry', 'DataFiles');
             end
             
+            % Get files within path, extract all names
             files = dir(path);
             file_names = convertCharsToStrings(...
                 arrayfun(@(x) x.name, files, 'UniformOutput', false));
             
-            file_names = file_names(contains(file_names, names, 'IgnoreCase', true));
-            
-            if nargin >= 3 && ~isempty(id)
-                
-                file_names = file_names(id);
-            end
+            % Narrow names down to those that match input patterns
+            file_names = file_names(...
+                contains(file_names, pattern, 'IgnoreCase', true));
             
             for i = numel(file_names):-1:1
                 
-                try
-                    str = fullfile(path, file_names(i));
-                catch
-                    str = join([path, file_names(i)], '/');
-                end
+                fid = fopen(fullfile(path, file_names(i)), 'r');
+                data = textscan(...
+                    fid, '%f%f', 'HeaderLines', 1, 'Collect', 1);
                 
-                fid = fopen(str,'r');
-                data = textscan(fid, '%f%f', 'HeaderLines', 1, 'Collect', 1);
+                % Create object from loaded data
                 aerofoil(i,:) = Aerofoil(data{1});
                 fclose(fid);
             end
-        end
-        function a = normal(c)
-            
-            [nx, nz] = normal2D(c(:,1), c(:,2));
-            a = [nx, nz];
-            %% TODO: Hack
-            %a(end+1,:) = a(end,:);
         end
         function a = violation(id)
             
@@ -447,7 +481,7 @@ classdef Aerofoil% < handle
                 base_name = "NACA66-206";
             end
             
-            base = Aerofoil.getaerofoil(base_name);
+            base = Aerofoil.get_aerofoil(base_name);
             base.check;
         end
         function plotter(varargin)

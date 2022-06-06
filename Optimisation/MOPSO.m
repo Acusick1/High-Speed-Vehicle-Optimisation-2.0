@@ -43,7 +43,7 @@ classdef MOPSO < PSO
                 save(fullfile(obj.save_dir, 'Init'));
             end
             
-            for i = 2:obj.maxIt + 1
+            for i = 2:obj.max_it + 1
                 
                 tic
                 obj = obj.update_position();
@@ -88,7 +88,7 @@ classdef MOPSO < PSO
                     
                     obj.save_opt(i-1);
                     % Resetting parpool to avoid OOM errors
-                    if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
+                    if ~isempty(gcp('nocreate')) && obj.max_it >= 500
                         
                         delete(gcp); 
                     end
@@ -102,7 +102,7 @@ classdef MOPSO < PSO
                 
                 % If extending simulation, set constraint tolerance to
                 % original final value
-                obj.maxIt = nIter;
+                obj.max_it = nIter;
                 obj.con_tol(end:nIter+1) = obj.con_tol(end);
             end
             if nargin >= 4 && ~isempty(rngState)
@@ -115,7 +115,7 @@ classdef MOPSO < PSO
             
             str = repmat('%4.3f ', 1, obj.nFun);
             
-            for i = it1:obj.maxIt + 1
+            for i = it1:obj.max_it + 1
                 
                 tic
                 obj = obj.update_position();
@@ -159,7 +159,7 @@ classdef MOPSO < PSO
                     
                     obj.save_opt(i-1);
                     %% Attempt to reset parpool to avoid OOM errors
-                    if ~isempty(gcp('nocreate')) && obj.maxIt >= 500
+                    if ~isempty(gcp('nocreate')) && obj.max_it >= 500
                         
                         delete(gcp); 
                     end
@@ -255,7 +255,7 @@ classdef MOPSO < PSO
     
     methods (Static)
         
-        function obj = restart(opt_dir, maxIt)
+        function obj = restart(opt_dir, max_it)
             %% TODO: Opt_file should be opt folder, otherwise Init overwritten
             %% TODO: Put i into obj, take from there
             % load(fullfile(opt_dir, 'Init'), 'sets', 'fn')
@@ -280,10 +280,10 @@ classdef MOPSO < PSO
                 rngState = [];
             end
             
-            if nargin < 2, maxIt = []; end
+            if nargin < 2, max_it = []; end
             
             obj.save_dir = opt_dir;
-            obj = obj.main_loop(it, maxIt, rngState);
+            obj = obj.main_loop(it, max_it, rngState);
         end
     end
 end

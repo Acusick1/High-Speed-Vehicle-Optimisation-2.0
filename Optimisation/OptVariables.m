@@ -1,4 +1,5 @@
 classdef OptVariables < Combinable
+    %% TODO: Split into two classes? One that contains part based optvariables, conditions etc, and one meta-object that takes part objects as an input?
     %% Optimisation variables class
     % Inputs: OptVariables(var_min, var_max, name, condition, transform, optimise)
     % var_min & var_max required
@@ -29,7 +30,7 @@ classdef OptVariables < Combinable
     methods
         function obj = OptVariables(varargin)
             
-            if nargin >= 1
+            if nargin > 0
                 
                 var_min = varargin{1};
                 var_max = varargin{2};

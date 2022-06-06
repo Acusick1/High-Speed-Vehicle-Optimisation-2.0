@@ -201,13 +201,13 @@ classdef Population < Design
                 
                 if nargin == 2 || fbased || special
                     
-                    id(i) = which(f1(i,:), f2(i,:));
+                    id(i) = choose_dominating(f1(i,:), f2(i,:));
                 else
-                    [~,id(i)] = min([sum(v1i), sum(v2i)]);
+                    [~, id(i)] = min([sum(v1i), sum(v2i)]);
                 end
             end
             
-            function [id] = which(f1, f2)
+            function [id] = choose_dominating(f1, f2)
                 
                 if all(f1 <= f2, 2) && any(f1 < f2, 2)
                     

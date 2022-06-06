@@ -69,9 +69,9 @@ classdef Viscous
             
                 Tw = Tw + obj.Twall;
                 obj.Twall = Tw;
-                maxIt = 1;
+                max_it = 1;
             else
-                maxIt = 100;
+                max_it = 100;
             end
             set = obj.Tedge <= 0;
             
@@ -83,7 +83,7 @@ classdef Viscous
             
             % [obj.cf, q, obj.Re] = obj.eckert(Tw);
             
-            for i = 1:maxIt
+            for i = 1:max_it
                 %% TODO: Comapred to DiGiorgio2019, commenting out gives closer result, cold wall assumption?
                 %% TODO: Also producing imaginary numbers
                 [obj.cf, q, obj.Re] = obj.eckert(Tw);
@@ -117,7 +117,7 @@ classdef Viscous
                     dTw = Tw(2:end,:) - prev(2:end,:);
                     abs_diff = sum(dTw(:).^2);
                     
-                    if all(isfinite(Tw(:))) && (abs_diff < 1e-6 || i >= maxIt)
+                    if all(isfinite(Tw(:))) && (abs_diff < 1e-6 || i >= max_it)
                         
                         % Only reset Twall here incase of prescribed Twall
                         obj.Twall = Tw;

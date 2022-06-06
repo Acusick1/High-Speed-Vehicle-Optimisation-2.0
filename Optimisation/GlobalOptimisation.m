@@ -67,7 +67,7 @@ classdef GlobalOptimisation < Optimisation
             id1 = con & bool;
             id2 = con & ~bool;
             
-            gamma = 1 - r.^((1 - it/obj.maxIt).^b);
+            gamma = 1 - r.^((1 - it/obj.max_it).^b);
             
             pos(id1) = pos(id1) + ...
                 (ubMat(id1) - pos(id1)) .* gamma(id1);
@@ -86,7 +86,7 @@ classdef GlobalOptimisation < Optimisation
             
             if numel(val) == 1
                 
-                val = repmat(val, obj.maxIt + 1, 1);
+                val = repmat(val, obj.max_it + 1, 1);
             end
             
             obj.con_tol = val;
@@ -96,12 +96,12 @@ classdef GlobalOptimisation < Optimisation
             
             if ~isempty(obj.con_tol), return; end
                 
-            t = obj.maxIt + 1;
+            t = obj.max_it + 1;
             cons = obj.penalty;
             nCon = size(cons, 2);
             % Switching condition limited to 500 iterations > set to ef
             % after
-            switchIt = min(ceil(obj.maxIt/2), 500);
+            switchIt = min(ceil(obj.max_it/2), 500);
             
             if nargin < 2 || isempty(tf), tf = switchIt; end
             if nargin < 3 || isempty(ef), ef = 0; end

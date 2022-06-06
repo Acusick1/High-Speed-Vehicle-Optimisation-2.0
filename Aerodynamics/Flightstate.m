@@ -70,7 +70,7 @@ classdef Flightstate
         function obj = get_atmospheric_values(obj)
                 
             output = tewari_atmosphere(obj.altitude, 0, 0);
-            
+             
             obj.Tinf = output(1); % Freestream temperature
             obj.rinf = output(2); % Freestream density
             obj.Pinf = output(7); % Freestream pressure
