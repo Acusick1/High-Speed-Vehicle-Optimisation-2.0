@@ -1,6 +1,6 @@
-classdef Bezier% < handle
+classdef Bezier
     
-    properties %(SetObservable, AbortSet)
+    properties
         
         control_points
     end
@@ -41,9 +41,6 @@ classdef Bezier% < handle
                     end
                 end
             end
-            
-            %% For testing
-            % addlistener(obj,'control_points','PostSet',@obj.update_plot);
         end
         function obj = set.control_points(obj, val)
             % Input: Vector of [xb1, zb1, ... xbn, zbn]

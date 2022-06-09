@@ -651,6 +651,12 @@ function offsets = get_zOffsets(body, xOffset)
 offsetsNd = 0.1:0.05:0.9;
 
 id = find(body.x(:,1) - xOffset > 0, 1) - 1;
-zint = two_point_interp(body.x(id:id+1,:)', body.z(id:id+1,:)', xOffset);
-offsets = two_point_interp([0 1], [min(zint) max(zint)], offsetsNd);
+
+x0 = body.x(id,:)';
+x1 = body.x(id + 1,:)';
+z0 = body.z(id,:)';
+z1 = body.z(id + 1,:)';
+zint = vec_interp(x0, x1, z0, z1, xOffset);
+
+offsets = vec_interp(0, 1, min(zint), max(zint), offsetsNd);
 end

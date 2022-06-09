@@ -8,7 +8,7 @@ classdef MOPSO < PSO
     end
     
     methods
-        function obj = main(obj)
+        function obj = run(obj)
 
             obj.variables = deal(obj.init_lhs(obj.nPop));
             

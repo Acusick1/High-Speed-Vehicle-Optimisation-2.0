@@ -40,13 +40,13 @@ classdef Aerodynamics
     end
     
     methods
-        function obj = Aerodynamics(viscous_objous, trim, states, nParts)
+        function self = Aerodynamics(viscous, trim, states, nParts)
             
             if nargin > 0
                 
                 temp = Aerodynamics();
                 
-                if nargin > 1 && viscous_objous, temp.viscous_obj = Viscous(); end
+                if nargin > 1 && viscous, temp.viscous_obj = Viscous(); end
                 if nargin < 2 || isempty(trim), trim = false; end
                 
                 temp.trim = trim;
@@ -56,39 +56,39 @@ classdef Aerodynamics
                     
                     for i = numel(states):-1:1
 
-                        obj(i,:) = temp;
-                        obj(i,:) = obj(i,:).set_flow(states(i));
+                        self(i,:) = temp;
+                        self(i,:) = self(i,:).set_flow(states(i));
                     end
                     if nargin >= 4 && ~isempty(nParts)
                         
-                        obj = repelem(obj, 1, nParts);
+                        self = repelem(self, 1, nParts);
                     end
                 else
-                    obj = temp;
+                    self = temp;
                 end
             end
         end
-        function obj = set_flow(obj, state)
+        function self = set_flow(self, state)
             
             gamma = state.gamma;
-            obj.cone_table = tangent_cone_table(state.Minf, gamma);
-            obj.vmax = pi/2 * (((gamma + 1)/(gamma - 1))^0.5 - 1);
-            obj.flow = state;
+            self.cone_table = tangent_cone_table(state.Minf, gamma);
+            self.vmax = pi/2 * (((gamma + 1)/(gamma - 1))^0.5 - 1);
+            self.flow = state;
         end
-        function obj = analyse(obj, varargin)
+        function self = analyse(self, varargin)
             
-            [nStates, nParts] = size(obj);
+            [nStates, nParts] = size(self);
             
             for i = 1:nStates
                 
-                temp = obj(i,1);
+                temp = self(i,1);
                 W = temp.weight;
                 
                 % If next state has same Mach and altitude, do not trim.
                 % Only reason this occurs is if uncertainty is desired in
                 % trim angle. Therefore do not re-trim, just apply 
                 % uncertainty 
-                if i > 1 && temp.trim && temp.flow.Minf == obj(i-1,1).flow.Minf
+                if i > 1 && temp.trim && temp.flow.Minf == self(i-1,1).flow.Minf
                     
                     temp.trim = false;
                     
@@ -97,16 +97,16 @@ classdef Aerodynamics
                         % If vehicle unable to trim, set alpha equal to
                         % previous for size consistency
                         try
-                            obj(i,j).flow.alpha = t.alpha + ...
+                            self(i,j).flow.alpha = t.alpha + ...
                                 temp.flow.alpha;
                         catch
-                            obj(i,j).flow.alpha = obj(i-1,j).flow.alpha + ...
+                            self(i,j).flow.alpha = self(i-1,j).flow.alpha + ...
                                 temp.flow.alpha;
                         end
                         
-                        obj(i,j).alpha_opt = obj(i-1,j).alpha_opt;
-                        obj(i,j).dCm_dalpha = obj(i-1,j).dCm_dalpha;
-                        obj(i,j).dCl_dbeta = obj(i-1,j).dCl_dbeta;
+                        self(i,j).alpha_opt = self(i-1,j).alpha_opt;
+                        self(i,j).dCm_dalpha = self(i-1,j).dCm_dalpha;
+                        self(i,j).dCl_dbeta = self(i-1,j).dCl_dbeta;
                     end
                 end
                 
@@ -123,13 +123,13 @@ classdef Aerodynamics
                         
                         if ~isempty(geometry)
                             
-                            obj(i,j) = obj(i,j).main(geometry);
+                            self(i,j) = self(i,j).main(geometry);
                         end
                     end
                     
-                    a = obj(i,1).flow.alpha;
-                    f = [obj(i,:).forces];
-                    fc = [obj(i,:).force_coeffs];
+                    a = self(i,1).flow.alpha;
+                    f = [self(i,:).forces];
+                    fc = [self(i,:).force_coeffs];
                     lift = sum([f.L]);
                     Cm = sum([fc.Cm]);
                     Cl = sum([fc.Cl]);
@@ -158,13 +158,13 @@ classdef Aerodynamics
                             end
                             
                             if isnan(dCm), dCm = 1; end
-                            obj(i,1).dCm_dalpha = dCm;
+                            self(i,1).dCm_dalpha = dCm;
                             
                             break
                         else
                             p.Cm = Cm;
                             p.Cl = Cl;
-                            p.alpha = obj(i,1).flow.alpha;
+                            p.alpha = self(i,1).flow.alpha;
                             
                             [t, alpha_conv] = update_alpha(lift, t);
                         end
@@ -172,8 +172,8 @@ classdef Aerodynamics
                         %% Next loop setup
                         for j = 1:nParts
                             
-                            obj(i,j).flow.alpha = t.alpha;
-                            obj(i,j).alpha_opt = t.alpha;
+                            self(i,j).flow.alpha = t.alpha;
+                            self(i,j).alpha_opt = t.alpha;
                         end
                     end
                 end
@@ -183,8 +183,8 @@ classdef Aerodynamics
                     
                     for j = nParts:-1:1
                         
-                        side1(i,j) = obj(i,j);
-                        side2(i,j) = obj(i,j);
+                        side1(i,j) = self(i,j);
+                        side2(i,j) = self(i,j);
                         side1(i,j).flow.beta = deg2rad(0.5);
                         side2(i,j).flow.beta = deg2rad(0.5);
                         
@@ -208,7 +208,7 @@ classdef Aerodynamics
                     fc2 = [side2(i,:).force_coeffs];
                     Clb = sum([fc1.Cl] + [fc2.Cl])/2;
                     
-                    obj(i,1).dCl_dbeta = (Clb - Cl)/deg2rad(0.5);
+                    self(i,1).dCl_dbeta = (Clb - Cl)/deg2rad(0.5);
                 end
             end
             
@@ -282,9 +282,9 @@ classdef Aerodynamics
                 t.count = t.count + 1;
             end
         end
-        function obj = main(obj, part)
+        function self = main(self, part)
             
-            f = obj.flow;
+            f = self.flow;
             
             Unorm = f.U/f.Uinf;
             
@@ -301,7 +301,7 @@ classdef Aerodynamics
             
             dim = size(area);
             
-            obj = obj.surface_velocity(unit_norm);
+            self = self.surface_velocity(unit_norm);
             d = asin(min(max(dotmat(-Unorm, unit_norm), -1), 1));
             d(area == 0) = 0;
             
@@ -311,33 +311,33 @@ classdef Aerodynamics
                 error("inclination NaN");
             end
             
-            obj.delta = d;
+            self.delta = d;
             
             %% Impact zone
-            [im, sh, obj.Cp, obj.Medge, obj.Pedge, obj.Tedge, obj.rho] = ...
+            [im, sh, self.Cp, self.Medge, self.Pedge, self.Tedge, self.rho] = ...
                 deal(zeros(dim));
             
-            [~, ~, iid] = Aerodynamics.get_method(class(part), obj.impact_method);
+            [~, ~, iid] = Aerodynamics.get_method(class(part), self.impact_method);
             % Panel faces flow as has non-zero area
-            im(obj.delta > 0 & area > 0) = iid;
+            im(self.delta > 0 & area > 0) = iid;
 
             % Angle to flow too large for attached shock
             % 99% used to avoid close calls being returned as NaN from
             % get_oblique_shock_angle
-            im(im & obj.delta >= f.max_delta * 0.99) = 1;
+            im(im & self.delta >= f.max_delta * 0.99) = 1;
             
             % Any method other than newtonian requires attached shock
             shock = im > 1;
-            target = tan(obj.delta(shock));
+            target = tan(self.delta(shock));
             
             % Get shockwave angles, any NaN values should have been dealt
             % with already, but setting to Newtonian just in case
-            beta = obj.get_oblique_shock_angle(target);
+            beta = self.get_oblique_shock_angle(target);
             im(shock(isnan(beta))) = 1;
             
             %% Shadow zone
-            [~, ~, sid] = Aerodynamics.get_method(class(part), obj.shadow_method);
-            sh(obj.delta <= 0 & area > 0) = sid;
+            [~, ~, sid] = Aerodynamics.get_method(class(part), self.shadow_method);
+            sh(self.delta <= 0 & area > 0) = sid;
 
             % For non-conical parts, where the streamwise and
             % x-dimension are assumed to be parallel. First shaded panel
@@ -355,52 +355,52 @@ classdef Aerodynamics
                 end
             end
             
-            obj.impact = im;
-            obj.shadow = sh;
+            self.impact = im;
+            self.shadow = sh;
 
-            obj = obj.method_switcher(obj.impact_method, im);
+            self = self.method_switcher(self.impact_method, im);
             
             % Mach_q essentially a placeholder
             % Replaced with interpolation from Mach = 0 normal to flow, to
             % first panel that does not use newtonian
             for i = 1:dim(2)
                 
-                int = obj.Medge(:,i) == f.Mach_q | isnan(obj.Medge(:,i));
+                int = self.Medge(:,i) == f.Mach_q | isnan(self.Medge(:,i));
                 a = find(~int, 1);
                 %% TODO: what if purely newtonian?
-                x0 = obj.delta(a, i);
-                y0 = obj.Medge(a, i);
+                x0 = self.delta(a, i);
+                y0 = self.Medge(a, i);
                 
                 if isempty(a) || y0 <= 0    
                     x0 = 0;
-                    y0 = obj.flow.Minf;
+                    y0 = self.flow.Minf;
                 end
               
                 x1 = pi/2;
-                xq = obj.delta(int, i);
+                xq = self.delta(int, i);
                 y1 = 0;
                 
-                obj.Medge(int, i) = y0 + (xq - x0).*((y1 - y0)./(x1 - x0));
+                self.Medge(int, i) = y0 + (xq - x0).*((y1 - y0)./(x1 - x0));
             end
             
-            obj = obj.method_switcher(obj.shadow_method, sh);
+            self = self.method_switcher(self.shadow_method, sh);
             
-            obj.part = part;
+            self.part = part;
             
-            if ~isempty(obj.viscous_obj)
-                %% TODO: Why is this taking the existing object?
-                viscous = Viscous.from_aerodynamics(obj, obj.viscous_obj);
+            if ~isempty(self.viscous_obj)
+                %% TODO: Why is this taking the existing selfect?
+                viscous = Viscous.from_aerodynamics(self, self.viscous_obj);
                 viscous = viscous.test();
                 cf = viscous.cf;
-                obj.viscous_obj = viscous;
+                self.viscous_obj = viscous;
             else
                 cf = [];
             end
             
-            obj.force_coeffs = ForceCoeffs(data, obj.Cp, cf, f.alpha, obj.Aref);
-            obj.forces = Forces(obj.force_coeffs, f, obj.Aref);
+            self.force_coeffs = ForceCoeffs(data, self.Cp, cf, f.alpha, self.Aref);
+            self.forces = Forces(self.force_coeffs, f, self.Aref);
         end
-        function obj = method_switcher(obj, methods, id)
+        function self = method_switcher(self, methods, id)
             
             fn = fieldnames(methods);
             for k = 1:max(id(:))
@@ -409,22 +409,22 @@ classdef Aerodynamics
                 
                 if any(con(:))
                     
-                    obj = obj.(fn{k})(con);
+                    self = self.(fn{k})(con);
                 end
             end
         end
-        function centre_of_pressure = get_centre_of_pressure(obj, centre)
+        function centre_of_pressure = get_centre_of_pressure(self, centre)
             
-            xyz_Cp = reshape(centre .* obj.Cp, [], 3, 1);
-            sum_Cp = sum(obj.Cp(:));
+            xyz_Cp = reshape(centre .* self.Cp, [], 3, 1);
+            sum_Cp = sum(self.Cp(:));
             
             centre_of_pressure = xyz_Cp/sum_Cp;
         end
-        function obj = newtonian(obj, con)
+        function self = newtonian(self, con)
             
-            f = obj.flow;
-            % theta = pi/2 - obj.delta(con);
-            theta = obj.delta(con);
+            f = self.flow;
+            % theta = pi/2 - self.delta(con);
+            theta = self.delta(con);
             
             Minf = f.Minf;
             Pinf = f.Pinf;
@@ -437,31 +437,31 @@ classdef Aerodynamics
             
             CpMax = a .* ((b.^c .* d) - 1);
             
-            obj.Cp(con) = CpMax .* sin(theta).^2;
-            P = Pinf .* (1 + (obj.Cp(con) * g * Minf.^2)/2);
+            self.Cp(con) = CpMax .* sin(theta).^2;
+            P = Pinf .* (1 + (self.Cp(con) * g * Minf.^2)/2);
             
-            Vel = magmat(obj.Vedge);
+            Vel = magmat(self.Vedge);
             
             Te = f.Tinf + (f.Uinf^2 - Vel(con).^2)/(2 * f.cp);
             
-            obj.rho(con) = P ./ (f.R * Te);
-            obj.Tedge(con) = Te;
-            obj.Pedge(con) = P;
-            obj.Medge(con) = f.Mach_q * ones(size(theta));
+            self.rho(con) = P ./ (f.R * Te);
+            self.Tedge(con) = Te;
+            self.Pedge(con) = P;
+            self.Medge(con) = f.Mach_q * ones(size(theta));
             
             % due_dx = f.q/(rhoe * ue) * cos(theta) * sin(theta);
         end
         
-        function obj = tangent_oblique_shock(obj, con)
+        function self = tangent_oblique_shock(self, con)
             
-            theta = obj.delta(con);
-            f = obj.flow;
+            theta = self.delta(con);
+            f = self.flow;
             
             Minf = f.Minf;
             Pinf = f.Pinf;
             g = f.gamma;
             
-            beta = obj.get_oblique_shock_angle(tan(theta), Minf, f.max_beta);
+            beta = self.get_oblique_shock_angle(tan(theta), Minf, f.max_beta);
             
             % Fundamentals of Aerodynamics, Anderson 2001 & Development of an
             % Aerodynamics Code for the Optimisation of Hypersonic Vehicles Jazra
@@ -480,20 +480,20 @@ classdef Aerodynamics
             
             M2 = Mn2./(sin(beta - theta));
             
-            obj.Medge(con) = M2;
+            self.Medge(con) = M2;
             % Anderson2006 p47
             % M1 = Minf as tangent assumes series of impinging shockwaves
-            obj.Cp(con) = (1/(0.5 * g * (Minf^2))) * (Pratio - 1);
-            obj.Pedge(con) = Pratio * Pinf;
-            obj.rho(con) = rratio * f.rinf;
+            self.Cp(con) = (1/(0.5 * g * (Minf^2))) * (Pratio - 1);
+            self.Pedge(con) = Pratio * Pinf;
+            self.rho(con) = rratio * f.rinf;
             % Eq of state
-            obj.Tedge(con) = (Pratio./rratio) * f.Tinf;
+            self.Tedge(con) = (Pratio./rratio) * f.Tinf;
         end
-        function obj = tangent_cone(obj, con)
+        function self = tangent_cone(self, con)
 
-            theta = obj.delta(con);
-            M1 = obj.flow.Minf;
-            g = obj.flow.gamma;
+            theta = self.delta(con);
+            M1 = self.flow.Minf;
+            g = self.flow.gamma;
             
             % Development of an Aerodynamics Code for the Optimisation of
             % Hypersonic Vehicles - gives M2 > M1
@@ -506,7 +506,7 @@ classdef Aerodynamics
             % denom = 1 + ((gamma-1)/2) * (Minf^2) * ((sin(tau).^2) - 2*((tau-theta).^2) .* (cos(theta).^2));
             % M = (numer./denom).^0.5;
             
-            [~, M2] = halfspace(tau, obj.cone_table);
+            [~, M2] = halfspace(tau, self.cone_table);
             M2(M2 > M1) = M1;
             
             %% TODO: Using Kbeta instead of K?
@@ -524,32 +524,32 @@ classdef Aerodynamics
             % Anderson2006 p38
             rratio = ((g + 1) * (Mn1.^2))./(2 + (g - 1) * (Mn1.^2));
             
-            obj.Medge(con) = M2;
-            obj.Cp(con) = sin(theta.^2) .* (1 + (frac1 .* log(frac2)));
-            obj.Pedge(con) = Pratio * obj.flow.Pinf;
-            obj.rho(con) = rratio * obj.flow.rinf;
+            self.Medge(con) = M2;
+            self.Cp(con) = sin(theta.^2) .* (1 + (frac1 .* log(frac2)));
+            self.Pedge(con) = Pratio * self.flow.Pinf;
+            self.rho(con) = rratio * self.flow.rinf;
             % Eq of state
-            obj.Tedge(con) = Pratio./rratio .* obj.flow.Tinf;
+            self.Tedge(con) = Pratio./rratio .* self.flow.Tinf;
         end
-        function obj = oblique_shock_prandtl_meyer(obj, con)
+        function self = oblique_shock_prandtl_meyer(self, con)
             
-            f = obj.flow;
+            f = self.flow;
             Minf = f.Minf;
             Pinf = f.Pinf;
             Tinf = f.Tinf;
             rinf = f.rinf;
             g = f.gamma;
             
-            d = obj.delta;
+            d = self.delta;
             ddiff = [d(1,:); diff(d)];
             [row, col] = size(ddiff);
             
-            %% TODO: Just have obj.Value set inside functions, set V1 = obj.V(i,:) in loop?
-            Cp2 = obj.Cp;
-            M2 = obj.Medge;
-            P2 = obj.Pedge;
-            T2 = obj.Tedge;
-            r2 = obj.rho;
+            %% TODO: Just have self.Value set inside functions, set V1 = self.V(i,:) in loop?
+            Cp2 = self.Cp;
+            M2 = self.Medge;
+            P2 = self.Pedge;
+            T2 = self.Tedge;
+            r2 = self.rho;
             
             for i = 1:row
                 
@@ -578,12 +578,12 @@ classdef Aerodynamics
                     
                     col_arr = 0:col-1;
                     id_newt = i + (col_arr(newt))*row;
-                    obj = obj.newtonian(id_newt);
-                    Cp2(i, newt) = obj.Cp(id_newt);
-                    M2(i, newt) = obj.Medge(id_newt);
-                    P2(i, newt) = obj.Pedge(id_newt);
-                    T2(i, newt) = obj.Tedge(id_newt);
-                    r2(i, newt) = obj.rho(id_newt);
+                    self = self.newtonian(id_newt);
+                    Cp2(i, newt) = self.Cp(id_newt);
+                    M2(i, newt) = self.Medge(id_newt);
+                    P2(i, newt) = self.Pedge(id_newt);
+                    T2(i, newt) = self.Tedge(id_newt);
+                    r2(i, newt) = self.rho(id_newt);
                 end
                 
                 if any(obs)
@@ -612,7 +612,7 @@ classdef Aerodynamics
                 % Must use shadow (~impact) instead of ~coni as using
                 % latter could overwrite flow properties already calculated
                 % from other impact methods
-                pm = (coni & ~shock) | (obj.shadow(i,:) & any(con(i+1:end, :)));
+                pm = (coni & ~shock) | (self.shadow(i,:) & any(con(i+1:end, :)));
                 
                 if any(pm)
                     
@@ -628,28 +628,28 @@ classdef Aerodynamics
                 if i > 1
                     
                     % If pm failed or if previous panel is base, next is also
-                    base = base | Cp2(i-1,:) == obj.get_base_pressure(Minf, g);
+                    base = base | Cp2(i-1,:) == self.get_base_pressure(Minf, g);
                 end
                 
                 if any(base)
                     
                     col_arr = 0:col-1;
                     id_base = i + (col_arr(base))*row;
-                    obj = obj.base(id_base);
-                    Cp2(i, base) = obj.Cp(id_base);
-                    M2(i, base) = obj.Medge(id_base);
-                    P2(i, base) = obj.Pedge(id_base);
-                    T2(i, base) = obj.Tedge(id_base);
-                    r2(i, base) = obj.rho(id_base);
+                    self = self.base(id_base);
+                    Cp2(i, base) = self.Cp(id_base);
+                    M2(i, base) = self.Medge(id_base);
+                    P2(i, base) = self.Pedge(id_base);
+                    T2(i, base) = self.Tedge(id_base);
+                    r2(i, base) = self.rho(id_base);
                 end
             end
             
             % Only return panel results asked for
-            obj.Cp = Cp2;
-            obj.Medge = M2;
-            obj.Pedge = P2;
-            obj.Tedge = T2;
-            obj.rho = r2;
+            self.Cp = Cp2;
+            self.Medge = M2;
+            self.Pedge = P2;
+            self.Tedge = T2;
+            self.rho = r2;
             
             function [Cp2, M2, P2, T2, r2] = oblique_shock(delta, M1, P1, T1, r1)
                 
@@ -660,7 +660,7 @@ classdef Aerodynamics
                 if nargin < 4 || isempty(T1), T1 = Tinf; end
                 if nargin < 5 || isempty(r1), r1 = rinf; end
                 
-                beta = obj.get_oblique_shock_angle(tan(delta), M1);
+                beta = self.get_oblique_shock_angle(tan(delta), M1);
                 
                 M2 = (1./(sin(beta - delta).^2) .* ...
                     ((g - 1) .* M1.^2 .* (sin(beta).^2) + 2)./ ...
@@ -709,7 +709,7 @@ classdef Aerodynamics
                 
                 [M2,~,~] = bisection(pm_fun, M1, 2 * max_mach, vMp2);
                 
-                [T2_T1, P2_P1, r2_r1] = obj.isentropic(M1, M2);
+                [T2_T1, P2_P1, r2_r1] = self.isentropic(M1, M2);
                 
                 T2 = T2_T1 .* T1;
                 P2 = P2_P1 .* P1;
@@ -718,9 +718,9 @@ classdef Aerodynamics
                 Cp2 = 2 * ((P2/Pinf) - 1)/(g * (Minf^2));
             end
         end
-        function beta = get_oblique_shock_angle(obj, target, M1, ub)
+        function beta = get_oblique_shock_angle(self, target, M1, ub)
             
-            f = obj.flow;
+            f = self.flow;
             
             if nargin < 3 || isempty(M1), M1 = f.Minf; end
             if nargin < 4 || isempty(ub)
@@ -730,7 +730,7 @@ classdef Aerodynamics
                 
                 if ~all(con)
                     
-                    [~, ub(~con)] = halfspace(M1(~con), obj.max_theta_beta_mach(:,[1 3]));
+                    [~, ub(~con)] = halfspace(M1(~con), self.max_theta_beta_mach(:,[1 3]));
                 end
             end
             
@@ -740,26 +740,26 @@ classdef Aerodynamics
             oblque_shock_eqn = @(B) 2*cot(B) .* ((M1.^2) .* (sin(B).^2) - 1)./((M1.^2) .* (g + cos(2*B)) + 2);
             [beta, ~, ~] = bisection(oblque_shock_eqn, 0, ub, target, 1e-3);
         end
-        function obj = base(obj, con)
+        function self = base(self, con)
 
-            f = obj.flow;
-%             obj.Medge(con) = f.Minf;
-%             obj.Tedge(con) = f.Tinf;
-%             obj.Pedge(con) = f.Pinf;
-%             obj.rho(con) = f.rinf;
+            f = self.flow;
+%             self.Medge(con) = f.Minf;
+%             self.Tedge(con) = f.Tinf;
+%             self.Pedge(con) = f.Pinf;
+%             self.rho(con) = f.rinf;
             
-            obj.Medge(con) = 0;
-            obj.Tedge(con) = 0;
-            obj.Pedge(con) = 0;
-            obj.rho(con) = 0;
-            obj.Cp(con) = obj.get_base_pressure(f.Minf, f.gamma);
+            self.Medge(con) = 0;
+            self.Tedge(con) = 0;
+            self.Pedge(con) = 0;
+            self.rho(con) = 0;
+            self.Cp(con) = self.get_base_pressure(f.Minf, f.gamma);
         end
-        function [obj, tang, surf] = surface_velocity(obj, unorm, normalise)
+        function [self, tang, surf] = surface_velocity(self, unorm, normalise)
             
-            tang = crossmat(unorm, obj.flow.U);
+            tang = crossmat(unorm, self.flow.U);
             surf = crossmat(tang, unorm);
             
-            obj.Vedge = surf;
+            self.Vedge = surf;
             
             if nargin >= 3 && normalise
                 
@@ -769,10 +769,10 @@ classdef Aerodynamics
                 surf = surf./surf_mag;
             end
         end
-        function [T2_T1, P2_P1, r2_r1] = isentropic(obj, M1, M2)
+        function [T2_T1, P2_P1, r2_r1] = isentropic(self, M1, M2)
             % Isentropic flow relations
             %% TODO: Move to flightstate?
-            g = obj.flow.gamma;
+            g = self.flow.gamma;
             
             T2_T1 = (1 + ((g - 1)/2) * (M1.^2)) ...
                 ./ (1 + ((g - 1)/2) * (M2.^2));
@@ -784,15 +784,15 @@ classdef Aerodynamics
     
     methods (Static)
         
-        function [fname, res, i] = get_method(name, obj)
+        function [fname, res, i] = get_method(name, self)
             
-            fields = fieldnames(obj);
+            fields = fieldnames(self);
             
             % In reverse order so that default is first method
             for i = numel(fields):-1:1
                 
                 fname = fields{i};
-                res = obj.(fname);
+                res = self.(fname);
                 
                 if isstring(res) && any(contains(name, res, 'IgnoreCase', true))
                     return

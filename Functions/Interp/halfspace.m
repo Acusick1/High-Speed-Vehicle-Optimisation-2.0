@@ -75,10 +75,12 @@ if ~isempty(y)
     lower_id(reduce) = lower_id(reduce) - 1;
     upper_id = lower_id + 1;
     
-    x_interp = [x(lower_id,:), x(upper_id, :)];
-    y_interp = [y(lower_id,:), y(upper_id, :)];
+    x0 = x(lower_id,:);
+    x1 = x(upper_id,:);
+    y0 = y(lower_id,:);
+    y1 = y(upper_id,:);
     
-    y_out = two_point_interp(x_interp, y_interp, target);
+    y_out = vec_interp(x0, x1, y0, y1, target);
     
     % If extrapolation not allowed, set values to x boundaries
     if ~extrap

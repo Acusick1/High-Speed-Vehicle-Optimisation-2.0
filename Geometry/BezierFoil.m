@@ -2,15 +2,18 @@ classdef BezierFoil < Aerofoil & Bezier
     
     properties
         
-        type = "direct"
+        type (1,1) string {mustBeMember(type, ["direct", "tc"])} = "direct"
         names
     end
     
     methods
-        function [obj] = BezierFoil(control_points, type)
-            
-            % addlistener(obj,'control_points','PostSet',@obj.dogenerate);
-            
+        function obj = BezierFoil(control_points, type)
+            %BEZIERFOIL constructor
+            %   Inputs:
+            %   control_points - an (n, 4) size matrix representing 2 sets
+            %       of control points in x and z dimensions, and n being 
+            %       the number of control points per set.
+            %% TODO: Why are control_points back to front?
             if nargin > 0
                 
                 if nargin >= 2 && ~isempty(type), obj.type = type; end
@@ -63,6 +66,8 @@ classdef BezierFoil < Aerofoil & Bezier
             obj.zl = obj.interp(xl, zl);
         end
         function obj = set_names(obj, vars)
+            %SET_NAMES defines control point variable names based on size
+            %of input
             
             [n,~] = size(obj.control_points);
             

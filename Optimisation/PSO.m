@@ -59,15 +59,16 @@ classdef PSO < GlobalOptimisation
         end
         
         function obj = update_cost(obj, i)
+            %% TODO: Uncomment when finished testing
+            % try
+                [obj.cost, obj.penalty, obj.penalties] = obj.cost_fun(obj.variables);
+            % catch ME
+            %     obj.save_opt(i);
+            %     rethrow(ME)
+            % end
             %% TODO: Hacky
             % Allows combined cost/vio functions to be used (default) along
             % with cost only functions
-            try
-                [obj.cost, obj.penalty, obj.penalties] = obj.cost_fun(obj.variables);
-            catch ME
-                obj.save_opt(i);
-                rethrow(ME)
-            end
 %                 obj.cost = obj.cost_fun(obj.variables);
 %                 
 %                 if isempty(obj.vio_fun)

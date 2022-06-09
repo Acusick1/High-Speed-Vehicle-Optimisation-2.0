@@ -36,13 +36,13 @@ classdef Flightstate
     end
     
     methods
-        function obj = Flightstate(varargin)
+        function self = Flightstate(varargin)
             %% Flightstate class
             % Inputs: alpha, Mach, altitude
             
             if nargin > 0
                 
-                if strcmpi(obj.order, "full_fact")
+                if strcmpi(self.order, "full_fact")
                 
                     states = Flightstate.full_fact(varargin);
                 else
@@ -58,28 +58,28 @@ classdef Flightstate
                 for i = size(states, 1):-1:1
                     for j = 1:size(states, 2)
                         
-                        obj(i).(fn{j}) = varargin{j}(states(i,j));
+                        self(i).(fn{j}) = varargin{j}(states(i,j));
                     end
                     
-                    obj(i) = obj(i).get_atmospheric_values();
-                    obj(i) = obj(i).max_shock_angles(table);
+                    self(i) = self(i).get_atmospheric_values();
+                    self(i) = self(i).max_shock_angles(table);
                 end
             end
         end
         
-        function obj = get_atmospheric_values(obj)
+        function self = get_atmospheric_values(self)
                 
-            output = tewari_atmosphere(obj.altitude, 0, 0);
+            output = tewari_atmosphere(self.altitude, 0, 0);
              
-            obj.Tinf = output(1); % Freestream temperature
-            obj.rinf = output(2); % Freestream density
-            obj.Pinf = output(7); % Freestream pressure
-            obj.a = output(5); % Speed of sound
-            obj.mu = output(8); % Dynamic viscosity
-            obj.kt = output(10); % Thermal conductivity
+            self.Tinf = output(1); % Freestream temperature
+            self.rinf = output(2); % Freestream density
+            self.Pinf = output(7); % Freestream pressure
+            self.a = output(5); % Speed of sound
+            self.mu = output(8); % Dynamic viscosity
+            self.kt = output(10); % Thermal conductivity
             
-            g = obj.gamma;
-            M = obj.Minf;
+            g = self.gamma;
+            M = self.Minf;
             
             % Freestream stagnation pressure ratio
             Pinf_P0 = (2./((g+1)*(M.^2))).^(g/(g-1)) .* ...
@@ -88,27 +88,27 @@ classdef Flightstate
             % Matching points for Newtonian + Prandtl-Meyer method
             % CHECK: reasonable results for all Mach numbers?
                 
-            [obj.delta_q, obj.Mach_q] = matching_point(g, Pinf_P0);
+            [self.delta_q, self.Mach_q] = matching_point(g, Pinf_P0);
             
-            obj.Pr = obj.mu .* obj.cp./obj.kt; % Prandtl number
-            obj.Uinf = M .* obj.a;
-            obj.q = 0.5 * obj.rinf .* obj.Uinf.^2;
+            self.Pr = self.mu .* self.cp./self.kt; % Prandtl number
+            self.Uinf = M .* self.a;
+            self.q = 0.5 * self.rinf .* self.Uinf.^2;
         end
-        function obj = max_shock_angles(obj, table)
+        function self = max_shock_angles(self, table)
             
             if nargin < 1
              
                 [~, table] = theta_beta_mach_curves();
             end
             
-            [~, angles] = halfspace(obj.Minf, table);
+            [~, angles] = halfspace(self.Minf, table);
             
-            obj.max_delta = angles(:,1);
-            obj.max_beta = angles(:,2);
+            self.max_delta = angles(1);
+            self.max_beta = angles(2);
         end
-        function a = get.U(obj)
+        function a = get.U(self)
             
-            a = obj.Uinf * [cos(obj.alpha) * cos(obj.beta), sin(obj.beta), sin(obj.alpha)];
+            a = self.Uinf * [cos(self.alpha) * cos(self.beta), sin(self.beta), sin(self.alpha)];
         end
     end
     

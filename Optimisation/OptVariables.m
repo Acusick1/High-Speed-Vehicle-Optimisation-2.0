@@ -28,146 +28,130 @@ classdef OptVariables < Combinable
     end
     
     methods
-        function obj = OptVariables(varargin)
+        function self = OptVariables(varargin)
             
             if nargin > 0
                 
                 var_min = varargin{1};
                 var_max = varargin{2};
                 
-                obj.var = (var_min(:) + var_max(:))'/2;
-                obj.nVar = length(obj.var);
+                self.var = (var_min(:) + var_max(:))'/2;
+                self.nVar = length(self.var);
                 constant = var_min == var_max;
-                obj.var_min = reshape(var_min(~constant), 1, []);
-                obj.var_max = reshape(var_max(~constant), 1, []);
+                self.var_min = reshape(var_min(~constant), 1, []);
+                self.var_max = reshape(var_max(~constant), 1, []);
                 
-                if nargin >= 3, obj.var_names = varargin{3}(:)'; end
+                if nargin >= 3, self.var_names = varargin{3}(:)'; end
                 
                 if nargin >= 4 && isstring(varargin{4})
                     
-                    obj.condition = varargin{4}(:)';
+                    self.condition = varargin{4}(:)';
                 else
-                    obj.condition = repmat("", 1, obj.nVar);
+                    self.condition = repmat("", 1, self.nVar);
                 end
                 
                 if nargin >= 5 && isstring(varargin{5})
                     
-                    obj.transform = varargin{5}(:)';
+                    self.transform = varargin{5}(:)';
                 else
-                    obj.transform = repmat("", 1, obj.nVar);
+                    self.transform = repmat("", 1, self.nVar);
                 end
                 
                 if nargin >= 6
                     
-                    obj.optimise = varargin{6}(:)';
+                    self.optimise = varargin{6}(:)';
                 else
-                    obj.optimise = true(1, obj.nVar);
+                    self.optimise = true(1, self.nVar);
                 end
                 
-                obj.optimise(constant) = false;
-                obj.nOpt = sum(obj.optimise);
+                self.optimise(constant) = false;
+                self.nOpt = sum(self.optimise);
             end
         end
-        function parts = builder(obj, var, varargin)
-            %% TODO: Varargout to match inputs?
-            [nPop, ~] = size(var);
+        function objects = builder(self, vars, varargin)
+            %% TODO: Move this to meta-object discuss at top
+            %BUILDER applies input variables to objects
+            [nObj, ~] = size(vars);
+            objects = varargin;
             
-            parts = varargin;
+            n = cumsum([0 self.partition]);
+            if isempty(n), n = self.nVar; end
             
-            n = obj.partition;
-            if isempty(n), n = obj.nVar; end
-            
-            pos_ind = 1:sum(n);
-            cumnum = cumsum(n);
-            
-            next = 1;
-            part = 0;
-            while true
+            for i = 1:numel(objects)
                 
-                if part == 0 || next > cumnum(part)
-                    
-                    part = part + 1;
-                end
+                object_id = n(i) + 1 : n(i+1);
+                object_vars = vars(:, object_id);
+                object_var_names = self.var_names(:, object_id);
                 
-                % Current variable may be vector, so choose all with same
-                % variable name 
-                current = obj.var_names(next);
-                % Variable names may repeat across parts, so only allow
-                % variables to be grabbed within current part variable 
-                % number bounds
-                con = current == obj.var_names;
-                
-                if part > 1
-                    
-                    outside = [1:cumnum(part-1), cumnum(part)+1:numel(con)];
-                else
-                    outside = cumnum(part)+1:numel(con);
-                end
-                
-                con(outside) = false;
-                
-                vari = mat2cell(var(:,con), ones(nPop, 1), sum(con));
-                
-                % Hack to ensure single variable set calls can be run
-                try
-                    [parts{part}.(current)] = vari{:};
-                catch
-                    parts{part} = parts{part}(1);
-                    parts{part}(1).(current) = vari{:};
-                end
-                
-                next = find(~con & pos_ind > next, 1);
-                if isempty(next), break; end
+                objects{i} = variables2object(...
+                    objects{i}, ...
+                    object_vars, ...
+                    object_var_names);
             end
             
-            %% Change to fully cell based
-            % Cannot do earlier due to struct access above
-%             for i = numel(parts):-1:1
-%                 
-%                 new(:,i) = mat2cell(parts{i}, ones(nPop, 1));
-%             end
+            function part = variables2object(part, vars, var_names)
+            
+                unqiue_props = unique(var_names, 'stable');
+
+                for prop_id = 1:numel(unqiue_props)
+                    
+                    prop = unqiue_props(prop_id);
+                    id = prop == var_names;
+                    
+                    if nObj == 1
+                        part.(prop) = vars(:, id);
+                    else
+                        prop_cell = mat2cell(...
+                            vars(:, id), ...
+                            ones(nObj, 1), ...
+                            sum(id));
+                        
+                        [part.(prop)] = prop_cell{:};
+                    end
+                end
+            end
         end
-        function obj = lincon(obj)
+        function self = lincon(self)
             
-            [obj.A, obj.Aeq] = deal(zeros(obj.nVar));
-            [obj.b, obj.beq] = deal(zeros(obj.nVar, 1));
+            [self.A, self.Aeq] = deal(zeros(self.nVar));
+            [self.b, self.beq] = deal(zeros(self.nVar, 1));
             
-            for i = 1:obj.nVar
+            for i = 1:self.nVar
                 
-                if ~isempty(obj.condition(i))
+                if ~isempty(self.condition(i))
                     
                     % Eqaulity or inequality (default is inequality)
-                    if contains(obj.condition(i), "=") && ~contains(obj.condition(i), "<")
+                    if contains(self.condition(i), "=") && ~contains(self.condition(i), "<")
                         
-                        [obj.Aeq(i,:), obj.beq(i)] = obj.str2con(i);
+                        [self.Aeq(i,:), self.beq(i)] = self.str2con(i);
                     else
-                        [obj.A(i,:), obj.b(i)] = obj.str2con(i);
+                        [self.A(i,:), self.b(i)] = self.str2con(i);
                     end
                 end
             end
             
-            if ~any(obj.A(:))
+            if ~any(self.A(:))
                 
-                obj.A = [];
-                obj.b = [];
+                self.A = [];
+                self.b = [];
             end
             
-            if ~any(obj.Aeq(:))
+            if ~any(self.Aeq(:))
                 
-                obj.Aeq = [];
-                obj.beq = [];
+                self.Aeq = [];
+                self.beq = [];
             end
         end
-        function [Arow, brow] = str2con(obj, row)
+        function [Arow, brow] = str2con(self, row)
             % Requries equations to be entered with spaces between major statements,
             % number at end must be constraint value
             % Examples: "3 x1 - 3 x2" will assume "<= 0"
             %           "-3 x1 <= 4"
             
-            Arow = zeros(1, obj.nVar);
-            array = 1:obj.nVar;
+            Arow = zeros(1, self.nVar);
+            array = 1:self.nVar;
             
-            splitstring = split(obj.condition(row), ' ');
+            splitstring = split(self.condition(row), ' ');
             
             % Special cases
             if any(contains(splitstring, "previous"))
@@ -185,7 +169,7 @@ classdef OptVariables < Combinable
             for i = 1:length(splitstring)
                 
                 check = str2double(splitstring(i));
-                col = array(splitstring(i) == obj.var_names);
+                col = array(splitstring(i) == self.var_names);
                 
                 if ~isnan(check)
                     
@@ -214,28 +198,28 @@ classdef OptVariables < Combinable
                 brow = 0;
             end
         end
-        function a = get.opt_var(obj)
+        function a = get.opt_var(self)
             
-            arr = 1:obj.nVar;
-            a = arr(obj.optimise);
+            arr = 1:self.nVar;
+            a = arr(self.optimise);
         end
-        function a = get.nOpt(obj)
+        function a = get.nOpt(self)
             
-            a = sum(obj.optimise);
+            a = sum(self.optimise);
         end
-        function a = get.nVar(obj)
+        function a = get.nVar(self)
             
-            a = numel(obj.var);
+            a = numel(self.var);
         end
-        function a = get.view(obj)
+        function a = get.view(self)
             
-            arr = 1:obj.nVar;
-            isOpt = ismember(arr, obj.opt_var)';
-            arr(isOpt) = 1:obj.nOpt;
+            arr = 1:self.nVar;
+            isOpt = ismember(arr, self.opt_var)';
+            arr(isOpt) = 1:self.nOpt;
             arr(~isOpt) = 0;
-            a = table(obj.var_names', arr', 'VariableNames', {'name', 'opt_id'});
+            a = table(self.var_names', arr', 'VariableNames', {'name', 'opt_id'});
         end
-        function [a, b] = init(obj, method, dim)
+        function [a, b] = init(self, method, dim)
             
             if nargin < 2 || isempty(method), method = "random"; end
             if nargin < 3 || isempty(dim), dim = 1; end
@@ -243,30 +227,30 @@ classdef OptVariables < Combinable
             switch method
                 case "random"
                     
-                    [a, b] = obj.init_random(dim);
+                    [a, b] = self.init_random(dim);
                     
                 case "lhs"
                     
-                    [a, b] = obj.init_lhs(dim);
+                    [a, b] = self.init_lhs(dim);
             end
         end
-        function [a, b] = init_lhs(obj, dim)
+        function [a, b] = init_lhs(self, dim)
             
-            a = [obj.var_min] + ...
-                lhsdesign(dim, sum([obj.nOpt]), 'criterion', 'maximin') .* ...
-                ([obj.var_max] - [obj.var_min]);
+            a = [self.var_min] + ...
+                lhsdesign(dim, sum([self.nOpt]), 'criterion', 'maximin') .* ...
+                ([self.var_max] - [self.var_min]);
             
-            b = obj.combine_var(a);
+            b = self.combine_var(a);
         end
-        function [a, b] = init_random(obj, dim)
+        function [a, b] = init_random(self, dim)
             
-            lbound = repmat([obj.var_min], dim, 1);
-            ubound = repmat([obj.var_max], dim, 1);
-            a = unifrnd(lbound, ubound, [dim, sum([obj.nOpt])]);
+            lbound = repmat([self.var_min], dim, 1);
+            ubound = repmat([self.var_max], dim, 1);
+            a = unifrnd(lbound, ubound, [dim, sum([self.nOpt])]);
             
-            b = obj.combine_var(a);
+            b = self.combine_var(a);
         end
-        function v = sensitivity(obj, id, n)
+        function v = sensitivity(self, id, n)
             %% Sensitivity analysis variable setup
             % Inputs: id (int, int vector)
             %         n  (number of steps)
@@ -277,8 +261,8 @@ classdef OptVariables < Combinable
             
             dFF = fullfact(n);
             
-            minv = obj.var_min;
-            maxv = obj.var_max;
+            minv = self.var_min;
+            maxv = self.var_max;
             v = repmat((minv + maxv)/2, size(dFF, 1), 1);
             
             for i = 1:vars
@@ -289,10 +273,10 @@ classdef OptVariables < Combinable
                 v(:,j) = vsens(dFF(:,i));
             end
         end
-        function b = combine_var(obj, opt_var)
+        function b = combine_var(self, opt_var)
             
-            b = repmat(obj.var, size(opt_var, 1), 1);
-            b(:,obj.opt_var) = opt_var;
+            b = repmat(self.var, size(opt_var, 1), 1);
+            b(:,self.opt_var) = opt_var;
         end
     end
     

@@ -52,65 +52,65 @@ classdef Viscous
     end
     
     methods
-        function obj = test(obj)
+        function self = test(self)
             
-            dim = size(obj.Tedge);
+            dim = size(self.Tedge);
             
-            if isempty(obj.turbulent)
+            if isempty(self.turbulent)
                 
-                obj.turbulent = true(dim);
+                self.turbulent = true(dim);
             end
             % Adiabatic wall condition
-            % Tw = obj.Taw(1,:);
+            % Tw = self.Taw(1,:);
             
             % Cold wall condition
             Tw = zeros(dim);
-            if ~isempty(obj.Twall)
+            if ~isempty(self.Twall)
             
-                Tw = Tw + obj.Twall;
-                obj.Twall = Tw;
+                Tw = Tw + self.Twall;
+                self.Twall = Tw;
                 max_it = 1;
             else
                 max_it = 100;
             end
-            set = obj.Tedge <= 0;
+            set = self.Tedge <= 0;
             
             if ~all(set(:))
                 
-                obj.Tedge(set) = min(obj.Tedge(~set));
-                obj.rho(set) = min(obj.rho(~set));
+                self.Tedge(set) = min(self.Tedge(~set));
+                self.rho(set) = min(self.rho(~set));
             end
             
-            % [obj.cf, q, obj.Re] = obj.eckert(Tw);
+            % [self.cf, q, self.Re] = obj.eckert(Tw);
             
             for i = 1:max_it
                 %% TODO: Comapred to DiGiorgio2019, commenting out gives closer result, cold wall assumption?
                 %% TODO: Also producing imaginary numbers
-                [obj.cf, q, obj.Re] = obj.eckert(Tw);
+                [self.cf, q, self.Re] = self.eckert(Tw);
                 
                 prev = Tw;
-                % qw = obj.simple_heating(Tw, Rn);
+                % qw = self.simple_heating(Tw, Rn);
                 
                 % Aerothermodynamics of Transatmospheric Vehicles
                 % Aero-Thermodynamics for Conceptual Design
-                % Tw = real((q/(obj.eps * obj.STF)).^0.25);
+                % Tw = real((q/(self.eps * self.STF)).^0.25);
                 
                 % DEPLOYED PAYLOAD ANALYSIS FOR A SINGLE STAGE TO ORBIT SPACEPLANE
                 % Sizing of Conceptual Hypersonic Long-Range Transport Aircraft using a Multi-Disciplinary Optimisation Strategy
-                % Tw = real((obj.Tinf^4 + (qw/(obj.eps * obj.STF))).^0.25);
+                % Tw = real((self.Tinf^4 + (qw/(self.eps * self.STF))).^0.25);
                 
                 % Comparison of Engineering Correlations for Predicting Heat Transfer in Zero-pressure-gradient Compressible Boundary Layers with CFD and Experimental Data
-                % Tw = ((q - qw)/(obj.eps * obj.STF) + obj.Tinf^4).^0.25;
-                Tw = real(((q - 0)./(obj.eps * obj.STF) + obj.Tinf.^4).^0.25);
+                % Tw = ((q - qw)/(self.eps * self.STF) + self.Tinf^4).^0.25;
+                Tw = real(((q - 0)./(self.eps * self.STF) + self.Tinf.^4).^0.25);
                 
                 %% TODO: CLEAN
                 try
-                    Tw(obj.part.quad_data.area == 0) = 0;
+                    Tw(self.part.quad_data.area == 0) = 0;
                 catch
-                    Tw(obj.part.data.area == 0) = 0;
+                    Tw(self.part.data.area == 0) = 0;
                 end
-                %con = Tw > obj.Taw | ~isfinite(Tw) | imag(Tw) > 0;
-                %Tw(con) = obj.Taw(con);
+                %con = Tw > self.Taw | ~isfinite(Tw) | imag(Tw) > 0;
+                %Tw(con) = self.Taw(con);
                 
                 if i > 1
                     %% TODO: Leading edge instability
@@ -120,39 +120,39 @@ classdef Viscous
                     if all(isfinite(Tw(:))) && (abs_diff < 1e-6 || i >= max_it)
                         
                         % Only reset Twall here incase of prescribed Twall
-                        obj.Twall = Tw;
+                        self.Twall = Tw;
                         break
                     end
                 end
             end
             
-            obj.qwall = q;
-            obj.max_Twall = max(Tw(:));
+            self.qwall = q;
+            self.max_Twall = max(Tw(:));
         end
-        function [cf_star, q, Re_star_x] = eckert(obj, Tw)
+        function [cf_star, q, Re_star_x] = eckert(self, Tw)
             
-            Te = obj.Tedge;
-            Me = obj.Medge;
-            % Pe = obj.Pre;
-            % Ve = Me * obj.a;
-            Ve = magmat(obj.Vedge);
-            turb = obj.turbulent;
+            Te = self.Tedge;
+            Me = self.Medge;
+            % Pe = self.Pre;
+            % Ve = Me * self.a;
+            Ve = magmat(self.Vedge);
+            turb = self.turbulent;
             
             %%
             % Original Eckert's reference temperature method
             % T_star = Te .* (1 + 0.032*(Me.^2) + 0.58*((Tw./Te) - 1));
             
             % Thermoelastic Formulation of a Hypersonic Vehicle Control Surface for Control-Oriented Simulation
-            % Tt = Te .* (1 + (obj.gamma - 1) .* ((Me.^2)/2));
-            % Tr = obj.r(2) * (Tt - Te) + Te;
+            % Tt = Te .* (1 + (self.gamma - 1) .* ((Me.^2)/2));
+            % Tr = self.r(2) * (Tt - Te) + Te;
             % T_star = Te + 0.5*(Tw - Te) + 0.22*(Tr - Te);
             
             % Meador-Smart reference temperature method - Lam & Turb
-            T_star1 = Te .* (0.45 + 0.55*(Tw./Te) + 0.16*obj.r(1) * ...
-                ((obj.gamma - 1)/2) .* Me.^2);
+            T_star1 = Te .* (0.45 + 0.55*(Tw./Te) + 0.16*self.r(1) * ...
+                ((self.gamma - 1)/2) .* Me.^2);
             
-            T_star2 = Te .* (0.5*(1 + (Tw./Te)) + 0.16*obj.r(2) * ...
-                ((obj.gamma - 1)/2) .* Me.^2);
+            T_star2 = Te .* (0.5*(1 + (Tw./Te)) + 0.16*self.r(2) * ...
+                ((self.gamma - 1)/2) .* Me.^2);
             
             T_star = zeros(size(turb));
             T_star(~turb) = T_star1(~turb);
@@ -160,14 +160,14 @@ classdef Viscous
             
             % Ideal gas law
             % Pedge Anderson2006 p368
-            rho_star = obj.Pedge./(obj.R * T_star);
-            % rho_star = obj.Pinf./(obj.R * T_star);
+            rho_star = self.Pedge./(self.R * T_star);
+            % rho_star = self.Pinf./(self.R * T_star);
             
             % Sutherland's law
-            mu_star = obj.mu * ((T_star/obj.Tinf).^1.5) .* ...
-                (obj.Tinf + obj.S)./(T_star + obj.S);
+            mu_star = self.mu * ((T_star/self.Tinf).^1.5) .* ...
+                (self.Tinf + self.S)./(T_star + self.S);
             
-            Re_star_x = (rho_star .* Ve .* obj.x)./mu_star; 
+            Re_star_x = (rho_star .* Ve .* self.x)./mu_star; 
             Re_star_x(Re_star_x < 1) = 0;
             
             % Accurate up to Re 10^9 according to 
@@ -183,7 +183,7 @@ classdef Viscous
             cf_star(turb) = 0.02296./((Re_star_x(turb)).^0.139);
             
             % Mangler factor for conical bodies
-            if obj.part.conical
+            if self.part.conical
                 
                 % White2006
                 ml = 1;
@@ -193,34 +193,34 @@ classdef Viscous
                 cf_star(turb) = (2 + mt)^(mt/(mt+1)) * cf_star(turb);
             end
             
-            % redge = obj.rho;
+            % redge = self.rho;
             %% TODO: Another (more reputable?) source also
             % Thermoelastic Formulation of a Hypersonic Vehicle Control Surface for Control-Oriented Simulation
             % Anderson2006 p286 (but stated as qw)
-            St_star = 0.5 * cf_star * obj.Pr^(-2/3);
-            % q = redge .* Ve .* St_star .* (obj.Taw - Tw) * obj.cp;
-            q = rho_star .* Ve .* St_star .* (obj.Taw - Tw) * obj.cp;
+            St_star = 0.5 * cf_star * self.Pr^(-2/3);
+            % q = redge .* Ve .* St_star .* (self.Taw - Tw) * self.cp;
+            q = rho_star .* Ve .* St_star .* (self.Taw - Tw) * self.cp;
             
             % Can be nan/inf due to zero area panels etc
             con = ~isfinite(cf_star);
             cf_star(con) = 0;
             q(con) = 0;
         end
-        function qw = simple_heating(obj, Tw, Rn)
+        function qw = simple_heating(self, Tw, Rn)
             
             if nargin < 1 || isempty(Tw)
-                % Tw = obj.Tinf; 
+                % Tw = self.Tinf; 
                 Tw = 0;
             end
             
-            h0 = obj.get_enthalpy(obj.T0);
-            hw = obj.get_enthalpy(Tw);
-            d = obj.del;
+            h0 = self.get_enthalpy(self.T0);
+            hw = self.get_enthalpy(Tw);
+            d = self.del;
             
             [rows, cols] = size(d);
             qw = zeros(rows, cols);
             
-            con = obj.Re < obj.Re_T;
+            con = self.Re < self.Re_T;
             % Ensures below will work as expected (one true per column)
             % Also ensures that in the work case strip will be set as fully
             % turbulent rather than fully laminar
@@ -235,10 +235,10 @@ classdef Viscous
             row = row - 1;
             
             xt_id = sort((col - 1) * rows + row);
-            xt = obj.x(xt_id)';
+            xt = self.x(xt_id)';
             
             qw_lam = lam();
-            qw_turb = turb(obj.x - xt);
+            qw_turb = turb(self.x - xt);
             
             qw(con) = qw_lam(con);
             qw(~con) = qw_turb(~con);
@@ -249,20 +249,20 @@ classdef Viscous
                 q0 = stagnation(Rn);
                 % Only invoked if nose radius is positive, and panel faces
                 % flow, otherwise flap plate relation holds
-                con = Rn > 0 & obj.Tedge(1,:) > obj.Tinf;
+                con = Rn > 0 & self.Tedge(1,:) > self.Tinf;
                 
-                if obj.part.conical
+                if self.part.conical
                     
                     qw(1,con) = q0(con);
                 else
                     %% TODO: Move to Wingsection
                     % Altering sweep from partition to panel based (as is
                     % nose radius)
-                    le_sweep = obj.part.lead_sweep;
+                    le_sweep = self.part.lead_sweep;
                     
                     for i = numel(le_sweep):-1:1
                         
-                        temp{i} = repmat(le_sweep(i), 1, obj.part.nPanels(i));
+                        temp{i} = repmat(le_sweep(i), 1, self.part.nPanels(i));
                     end
                     
                     le_sweep = [[temp{:}], le_sweep(end), flip([temp{:}])];
@@ -279,16 +279,16 @@ classdef Viscous
                 N = 0.5;
                 C = 1.83e-8 * Rn.^-0.5 .* (1 - hw(1,:)./h0);
                 
-                qw = obj.rinf^N * obj.Uinf^M * C;
+                qw = self.rinf^N * self.Uinf^M * C;
             end
             function qw = lam(row)
                 
                 if nargin == 1 && ~isempty(row)
                     
                     d = d(row,:);
-                    X = obj.x(row,:);
+                    X = self.x(row,:);
                 else
-                    X = obj.x;
+                    X = self.x;
                 end
                 
                 M = 3.2;
@@ -296,7 +296,7 @@ classdef Viscous
                 C = 2.53e-9 * cos(d).^0.5 .* sin(d) .* ...
                     X.^-0.5 .* (1 - hw/h0);
                 
-                qw = obj.rinf^N * obj.Uinf^M * C;
+                qw = self.rinf^N * self.Uinf^M * C;
             end
             function qw = turb(xt)
                 %% TODO: Skin friction hack
@@ -306,7 +306,7 @@ classdef Viscous
                 % However now assuming -d gives same skin friction as +d,
                 % At least for this term
                 
-                if obj.Uinf > 3962                    
+                if self.Uinf > 3962                    
                 
                     M = 3.7;
                     N = 0.8;
@@ -322,32 +322,32 @@ classdef Viscous
                         xt.^-0.2 .* (Tw/566).^-0.25 .* (1 - (1.11*hw/h0));
                 end
                 
-                qw = obj.rinf^N * obj.Uinf^M * C;
+                qw = self.rinf^N * self.Uinf^M * C;
             end
         end
         
-        function a = get.Re_T(obj)
+        function a = get.Re_T(self)
             
             % Source: Three-Dimensional Laminar Boundary-Layer Transition on a Sharp 88 Cone at Mach 10
-            a = exp(6.421 * exp(1.209e-4 * obj.Medge.^2.641));
+            a = exp(6.421 * exp(1.209e-4 * self.Medge.^2.641));
         end
         
-        function qw = medium_heating(obj, Tw, Rn, laminar)
+        function qw = medium_heating(self, Tw, Rn, laminar)
             
-            if nargin < 1 || isempty(Tw), Tw = obj.Tinf; end
+            if nargin < 1 || isempty(Tw), Tw = self.Tinf; end
             if nargin < 3 || isempty(laminar), laminar = true; end
             
-            redge = obj.Pedge/(287 * obj.Tedge);
+            redge = self.Pedge/(287 * self.Tedge);
             
             if ~isempty(Rn)
                 
-                if obj.part.conical
+                if self.part.conical
                     
                     qw = stagnation(Rn);
                 else
                     %% TODO: As in simple heating
                     % Hacky way to get sweep for upper/lower surfaces
-                    le_sweep = obj.part.lead_sweep([1:end end end:-1:1]);
+                    le_sweep = self.part.lead_sweep([1:end end end:-1:1]);
                     
                     q0 = stagnation(Rn);
                     qfp = lam(1);
@@ -361,76 +361,76 @@ classdef Viscous
             
             function stagnation(Rn)
                 
-                due_dx = 1./Rn .* (2 * (obj.Pedge - obj.Pinf)./redge).^0.5;
+                due_dx = 1./Rn .* (2 * (self.Pedge - self.Pinf)./redge).^0.5;
                 
-                if obj.conical
+                if self.conical
                     
                     const = 0.763;
                 else
                     const = 0.57;
                 end
                 
-                qw = const * obj.Pr^-0.6 * (redge * medge).^0.5 ...
+                qw = const * self.Pr^-0.6 * (redge * medge).^0.5 ...
                     * due_dx.^0.5 .* (haw - hw);
             end
         end
-        function h = get_enthalpy(obj, T)
+        function h = get_enthalpy(self, T)
             % Calorifically perfect gas: Anderson2006 p276
-            h = obj.cp * T;
+            h = self.cp * T;
         end
-        function T = get_temperature(obj, h)
+        function T = get_temperature(self, h)
             % Calorifically perfect gas: Anderson2006 p276
-            T = h / obj.cp;
+            T = h / self.cp;
         end
-        function a = get.Cf(obj)
+        function a = get.Cf(self)
             
-            dimensionalise = (obj.cf .* obj.part.quad_data.area)/obj.Aref;
+            dimensionalise = (self.cf .* self.part.quad_data.area)/self.Aref;
             a = sum(dimensionalise(:));
         end
-        function a = get.x(obj)
+        function a = get.x(self)
             %% TODO: Move to Geometry
-            if obj.part.conical
+            if self.part.conical
                 
-                le = mean(obj.part.points(1,:,:));
-                centre = obj.part.centre - le;
+                le = mean(self.part.points(1,:,:));
+                centre = self.part.centre - le;
                 centre = [zeros(1, size(centre, 2), 3); centre];
             else
                 %% TODO: Correct? Make consistent                
                 try
-                    le = (obj.part.points(1,1:end-1,:) + ...
-                        obj.part.points(1,2:end,:))/2;
-                    centre = obj.part.centre - le;
+                    le = (self.part.points(1,1:end-1,:) + ...
+                        self.part.points(1,2:end,:))/2;
+                    centre = self.part.centre - le;
                     centre = [zeros(1, size(centre, 2), 3); centre];
                 catch
                     le = zeros(1, 1, 2);
-                    centre = obj.part.data.centre - le;
+                    centre = self.part.data.centre - le;
                     centre = [zeros(1, size(centre, 2), 2); centre];
                 end
             end
 
             a = cumsum(magmat(diff(centre)));
         end
-        function a = get.Uinf(obj)
+        function a = get.Uinf(self)
             
-            a = obj.Minf * obj.a;
+            a = self.Minf * self.a;
         end
-        function a = get.T0(obj)
+        function a = get.T0(self)
             
-            a = obj.Tinf * (1 + (obj.gamma - 1)/2 * (obj.Minf^2));
+            a = self.Tinf * (1 + (self.gamma - 1)/2 * (self.Minf^2));
         end
-        function a = get.Taw(obj)
+        function a = get.Taw(self)
             
-            con = obj.turbulent;
+            con = self.turbulent;
             
             a = zeros(size(con));
             
-            a(con) = obj.r(2)*(obj.T0 - obj.Tedge(con)) + obj.Tedge(con);
-            a(~con) = obj.r(1)*(obj.T0 - obj.Tedge(~con)) + obj.Tedge(~con);
+            a(con) = self.r(2)*(self.T0 - self.Tedge(con)) + self.Tedge(con);
+            a(~con) = self.r(1)*(self.T0 - self.Tedge(~con)) + self.Tedge(~con);
         end
-        function a = get.r(obj)
+        function a = get.r(self)
             
             % [laminar, turbulent]
-            a = [obj.Pr^(1/2), obj.Pr^(1/3)];
+            a = [self.Pr^(1/2), self.Pr^(1/3)];
         end
     end
     
