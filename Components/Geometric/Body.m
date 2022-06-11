@@ -1,5 +1,5 @@
 classdef Body < Geometry
-    %AFTBODY Summary of this class goes here
+    %BODY Summary of this class goes here
     %   Detailed explanation goes here
     
     properties (Dependent)
@@ -33,11 +33,7 @@ classdef Body < Geometry
             a = trapz(obj.x(:,1), max(obj.y, [], 2)); 
         end
         function a = get.volume(obj)
-            
-            % if isempty(obj.quad_data), obj.get_data; end
-            % data = obj.quad_data;
-            % a = 1/3 * sum(sum(dotmat(data.centre, data.unit_norm) .* data.area));
-            
+
             % Calculates full volume (not half-body)
             [~,a] = convhull([obj.x(:); obj.x(:)], [obj.y(:); -obj.y(:)], ...
                 [obj.z(:); obj.z(:)]);
@@ -63,7 +59,7 @@ classdef Body < Geometry
                 z = [repmat(point, 1, cols); z];
                 y = [zeros(1, cols); y];
                 % Small offsets for unique interpolation purposes
-                x = [x(1,:) - 1e-6; x];
+                x = [x(1,:) - 1e-9; x];
             end
             
             if ~all(z(end,:) == z(end))
@@ -71,7 +67,7 @@ classdef Body < Geometry
                 point = mean(z(end,:));
                 z = [z; repmat(point, 1, cols)];
                 y = [y; zeros(1, cols)];
-                x = [x; x(end,:) + 1e-6];
+                x = [x; x(end,:) + 1e-9];
             end
         end
     end

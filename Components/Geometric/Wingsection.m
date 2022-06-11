@@ -53,7 +53,7 @@ classdef Wingsection < Geometry
             end
             
         end
-        function self = dogenerate(self)
+        function self = generate(self)
             
             aerofoils = self.sections;
             nFoil = numel(aerofoils);
@@ -113,6 +113,8 @@ classdef Wingsection < Geometry
             else
                 self.nPanels = ones(1, self.nParts);
             end
+            
+            self = self.get_data();
         end
         function a = check(self, id)
             %% TODO: This (id) or docheck as in Aerofoil
@@ -381,15 +383,16 @@ classdef Wingsection < Geometry
     
     methods (Static)
         function [init_obj, a] = define()
-            
+            %% TODO: Should define full object here, not just optimisation variables
+            %       
             a(1) = struct('name', "chord", 'min', [0.25 0.2 0.1], 'max', [0.9 0.75 0.7]);
             a(2) = struct('name', "span", 'min', [0.1 0.1], 'max', [0.9 0.7]);
             % a(2) = struct('name', "span", 'min', [0.5 0.5], 'max', [5 5]);
             a(3) = struct('name', "trail_sweep", 'min', -[pi/4 pi/4], 'max', [pi/4 pi/4]);
             a(4) = struct('name', "dihedral", 'min', [0 0], 'max', [pi/4 pi/4]);
             % Scaled by body length
-            a(5) = struct('name', "offset", 'min', 0.1, 'max', 0.75);
-            
+            a(5) = struct('name', "offset", 'min', [0.1 0], 'max', [0.75 0]);
+
             init_obj = Wingsection();
             [init_obj, a] = Geometry.define(init_obj, a);
         end

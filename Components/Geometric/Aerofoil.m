@@ -339,9 +339,11 @@ classdef Aerofoil
         end
         function coords = get.coords(obj)
             
-            % 2:end avoids two leading edge points
-            coords = [flipud([obj.xu, obj.zu]);
-                      obj.xl(2:end), obj.zl(2:end)];
+            if ~isempty(obj.zu) && ~isempty(obj.zl)
+                % 2:end avoids two leading edge points
+                coords = [flipud([obj.xu, obj.zu]);
+                          obj.xl(2:end), obj.zl(2:end)];
+            end
         end
         function area = get.area(obj)
             
@@ -371,6 +373,7 @@ classdef Aerofoil
         end
         function plot(obj, fig_num)
             %% TODO: Still relevant? Only has BezierFoil option
+            
             if nargin >= 2 && isnumeric(fig_num)
             
                 f = figure(fig_num);
@@ -440,7 +443,7 @@ classdef Aerofoil
             end
             if nargin < 2 || isempty(path)
                 
-                path = fullfile(get_base_path(), 'Geometry', 'DataFiles');
+                path = fullfile(get_base_path(), 'Configs', 'Geometric', 'DataFiles');
             end
             
             % Get files within path, extract all names
@@ -452,6 +455,7 @@ classdef Aerofoil
             file_names = file_names(...
                 contains(file_names, pattern, 'IgnoreCase', true));
             
+            aerofoil = [];
             for i = numel(file_names):-1:1
                 
                 fid = fopen(fullfile(path, file_names(i)), 'r');

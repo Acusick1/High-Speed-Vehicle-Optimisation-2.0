@@ -16,7 +16,7 @@ classdef Wedge < Body
                 obj.angle = angle;
             end
         end
-        function dogenerate(obj)
+        function generate(obj)
             
             yDisc = obj.yDisc - 0.5;
             rows = numel(obj.xDisc);

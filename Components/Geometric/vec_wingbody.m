@@ -1,5 +1,7 @@
 function [wing, lbody, ubody, extWing] = vec_wingbody(wing, body)
 
+body = body.generate();
+
 % Removing body boundary from interpolant so that wing cannot alter it
 bx = body.x(2:end-1, 2:end-1);
 by = body.y(2:end-1, 2:end-1);
@@ -54,7 +56,7 @@ while cont
         offCount = find(yOffset > yMinOffsetRatio * max(yOffset), 1);
     end
     
-    wing = wing.dogenerate();
+    wing = wing.generate();
         
     extWing = wing;
     extWing.y = extWing.y + yOffset(offCount);

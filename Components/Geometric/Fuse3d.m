@@ -1,6 +1,6 @@
 classdef Fuse3d < Body
     
-    properties %(SetObservable)
+    properties
         
         length
         w
@@ -35,16 +35,8 @@ classdef Fuse3d < Body
                 obj.Ad = Ad;
             end
             
-%             addlistener(obj,'length','PostSet',@obj.initialise);
-%             addlistener(obj,'w','PostSet',@obj.initialise);
-%             addlistener(obj,'h','PostSet',@obj.initialise);
-%             addlistener(obj,'nc','PostSet',@obj.initialise);
-%             addlistener(obj,'nd','PostSet',@obj.initialise);
-%             addlistener(obj,'Acu','PostSet',@obj.initialise);
-%             addlistener(obj,'Acl','PostSet',@obj.initialise);
-%             addlistener(obj,'Ad','PostSet',@obj.initialise);
         end
-        function obj = dogenerate(obj)
+        function obj = generate(obj)
             
             S = obj.shapefuns;
             C = obj.classfuns;
@@ -67,7 +59,7 @@ classdef Fuse3d < Body
             
             obj.upper = zu;
             obj.lower = zl;
-            obj.get_data;
+            obj = obj.get_data();
         end
         function obj = set.Acu(obj, in)
             %% TODO: Yay or nae (Change to inc_array fun anyway)
@@ -238,7 +230,7 @@ classdef Fuse3d < Body
             Acl = -[0.044, 0.371];
             Ad = [0.258, 0.159, 0.170, 0.199];
             obj = Fuse3d(L, nc, nd, c, d, Acu, Acl, Ad);
-            obj.dogenerate;
+            obj.generate;
             obj.plot()
         end
     end

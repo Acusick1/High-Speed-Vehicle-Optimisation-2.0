@@ -78,12 +78,12 @@ classdef Bezier
             end
             
             obj.control_points = val;
-            obj = obj.generate();
+            % obj = obj.generate();
         end
-        function obj = generate(obj)
-            
-            obj = obj.dogenerate();
-        end
+%         function obj = generate(obj)
+%             
+%             obj = obj.generate();
+%         end
         function a = get.xcp(obj)
             
             a = obj.control_points(:,1:2:end);

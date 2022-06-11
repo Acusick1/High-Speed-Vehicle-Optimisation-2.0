@@ -56,7 +56,7 @@ classdef HermiteFuse < Body
             addlistener(obj,'r','PostSet',@obj.initialise);
             addlistener(obj,'phi','PostSet',@obj.initialise);
         end
-        function obj = dogenerate(obj)
+        function obj = generate(obj)
             
             obj.nose.radius = obj.nradius;
             obj.nose.length = obj.nlength;
@@ -352,7 +352,7 @@ classdef HermiteFuse < Body
             obj.nradius = 0.25;
             obj.nlength = 0.5;
             obj.noffset(2) = 0.5;
-            obj.dogenerate();
+            obj.generate();
             obj.plot;
         end
         function obj = test_polar()
@@ -366,7 +366,7 @@ classdef HermiteFuse < Body
             obj.nradius = 0.25;
             obj.nlength = 0.5;
             obj.noffset(2) = 0.5;
-            obj.dogenerate();
+            obj.generate();
             obj.plot;
             obj.doplot;
         end
@@ -402,7 +402,7 @@ classdef HermiteFuse < Body
             obj.nradius = 0.01;
             obj.nlength = 0.1115;
             obj.noffset(2) = .9;
-            obj.dogenerate();
+            obj.generate();
             obj.plot;
             obj.doplot;
         end

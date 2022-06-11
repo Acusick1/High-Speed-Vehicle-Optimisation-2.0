@@ -1,6 +1,6 @@
-classdef Geometry% < handle & matlab.mixin.Copyable 
+classdef Geometry 
     
-    properties %(SetObservable, GetObservable)
+    properties
         
         points
         x
@@ -12,31 +12,17 @@ classdef Geometry% < handle & matlab.mixin.Copyable
         quad_data
         update = true
         vio
-    end
-    
-    properties (Dependent)
-        
         nose_rad
         nose_id
     end
     
     methods
-        function obj = Geometry()
-            %% TODO: Quad_data not auto-updating
-%             el(1) = addlistener(obj,'x','PreGet',@obj.generate);
-%             el(2) = addlistener(obj,'y','PreGet',@obj.generate);
-%             el(3) = addlistener(obj,'z','PreGet',@obj.generate);
-%             
-%             obj.el = el;
-        end
+%         function obj = Geometry()
+% 
+%         end
         function obj = initialise(obj, varargin)
             
             obj.update = true;
-        end
-        function obj = set.z(obj, val)
-            
-            obj.z = val;
-            obj = obj.get_data();
         end
         function a = get.sz(obj)
             
@@ -48,18 +34,18 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             p(:,:,2) = obj.y;
             p(:,:,3) = obj.z;
         end
-        function obj = generate(obj, inputMetaProp, varargin)
-            
-            if obj.update || isempty(obj.(inputMetaProp.Name))
-                
-                obj.update = false;
-                obj = obj.dogenerate();
-                obj = obj.get_data();
-                %% For testing
-                % obj.update_plot();
-            end
-        end
-        function obj = get_data(obj, varargin)
+%         function obj = generate(obj, inputMetaProp, varargin)
+%             
+%             if obj.update || isempty(obj.(inputMetaProp.Name))
+%                 
+%                 obj.update = false;
+%                 obj = obj.generate();
+%                 obj = obj.get_data();
+%                 %% For testing
+%                 % obj.update_plot();
+%             end
+%         end
+        function obj = get_data(obj)
             
             qua.id = obj.quad_id(obj.sz);
             tri.id = obj.tri_id(qua.id);
@@ -172,15 +158,15 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             norm = crossmat(vec2, vec1);
             mag = magmat(norm);
         end
-        function a = get.nose_id(obj)
+        function obj = get_nose_id(obj)
            %% TODO: Hardcoding, correct nose location?
            % Also centre hack
             xNorm = obj.x - obj.x(1,:);
             xNorm = (xNorm(1:end-1, 1:end-1) + xNorm(1:end-1, 2:end) ...
                   + xNorm(2:end, 1:end-1) + xNorm(2:end, 2:end))/4;
-            a = xNorm < 0.05;
+            obj.nose_id = xNorm < 0.05;
         end    
-        function a = get.nose_rad(obj)
+        function obj = get_nose_rad(obj)
             %% TODO: Hardcoding, correct nose location?
             % Translating to ensure nose start at (0,0)
             xInt = obj.x - obj.x(1,:);
@@ -240,7 +226,7 @@ classdef Geometry% < handle & matlab.mixin.Copyable
             
             % Since forces etc calculated on panel centre, best to do same
             % with nose radius
-            a = (rad(1:end-1) + rad(2:end))/2;
+            obj.nose_rad = (rad(1:end-1) + rad(2:end))/2;
         end
         function splot = plot(obj, quad, surf_data, views)
             

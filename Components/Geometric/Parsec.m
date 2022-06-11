@@ -37,7 +37,7 @@ classdef Parsec < Aerofoil
                     -1/4*p(5)^(-3/2) 3/4*p(5)^(-1/2) 15/4*p(5)^(1/2) 35/4*p(5)^(3/2) 63/4*p(5)^(5/2) 99/4*p(5)^(7/2);
                     1 0 0 0 0 0];
                 
-                %Coefficients of 'b' upper and lower
+                % Coefficients of 'b' upper and lower
                 Bup = [p(8)+p(9)/2 p(3) tand((2*p(10)-p(11))/2) 0 p(4) sqrt(2*p(1))]';
                 
                 Blo = [p(8)-p(9)/2 p(6) tand((2*p(10)+p(11))/2) 0 p(7) -sqrt(2*p(12))]';
@@ -59,7 +59,7 @@ classdef Parsec < Aerofoil
                 obj.zl = zl;
             end
         end
-        function obj = dogenerate(obj)
+        function obj = generate(obj)
             
             p(1) = obj.rleu;
             p(2) = obj.xup;
@@ -114,7 +114,7 @@ classdef Parsec < Aerofoil
         function obj = set.rlel(obj, val)
             
             obj.rlel = val;
-            obj = obj.dogenerate;
+            obj = obj.generate;
         end
     end
     

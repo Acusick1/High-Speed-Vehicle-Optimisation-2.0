@@ -8,7 +8,7 @@ results_path = fullfile(base_path, "Results");
 addpath(genpath(fullfile(base_path, "Aerodynamics")))
 addpath(genpath(fullfile(base_path, "External")))
 addpath(genpath(fullfile(base_path, "Functions")))
-addpath(genpath(fullfile(base_path, "Geometry")))
+addpath(genpath(fullfile(base_path, "Components")))
 addpath(genpath(fullfile(base_path, "Optimisation")))
 
 setenv("BASE_PATH", base_path)

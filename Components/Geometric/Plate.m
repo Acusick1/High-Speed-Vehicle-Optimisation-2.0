@@ -6,11 +6,7 @@ classdef Plate < Body
     end
     
     methods
-        function obj = Plate()
-            
-            obj.conical = false;
-        end
-        function dogenerate(obj)
+        function generate(obj)
             
             yDisc = obj.yDisc - 0.5;
             rows = numel(obj.xDisc);

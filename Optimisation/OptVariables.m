@@ -23,7 +23,7 @@ classdef OptVariables < Combinable
     end
     properties (Dependent)
         
-        opt_var
+        opt_var_id
         view
     end
     
@@ -68,25 +68,37 @@ classdef OptVariables < Combinable
                 self.nOpt = sum(self.optimise);
             end
         end
-        function objects = builder(self, vars, varargin)
-            %% TODO: Move this to meta-object discuss at top
+        function objects = builder(self, input_vars, varargin)
+            %% TODO: Move this to meta-object discussed at top
+            %% TODO: Does this have a vectorised use case anymore?
             %BUILDER applies input variables to objects
-            [nObj, ~] = size(vars);
+            [nSets, ~] = size(input_vars);
+            
+            vars = repmat(self.var, nSets, 1);
+            vars(:, self.opt_var_id) = input_vars;
+            
             objects = varargin;
             
-            n = cumsum([0 self.partition]);
-            if isempty(n), n = self.nVar; end
-            
-            for i = 1:numel(objects)
+            %% TODO: Clean logic once above
+            if numel(objects) == 1 && ...
+                    (isempty(self.partition) || numel(self.partition) == 1)
                 
-                object_id = n(i) + 1 : n(i+1);
-                object_vars = vars(:, object_id);
-                object_var_names = self.var_names(:, object_id);
-                
-                objects{i} = variables2object(...
-                    objects{i}, ...
-                    object_vars, ...
-                    object_var_names);
+                objects = variables2object(objects, vars, self.var_names);
+            else
+                n = cumsum([0 self.partition]);
+                if isempty(n), n = self.nVar; end
+
+                for i = 1:numel(objects)
+
+                    object_id = n(i) + 1 : n(i+1);
+                    object_vars = vars(:, object_id);
+                    object_var_names = self.var_names(:, object_id);
+
+                    objects{i} = variables2object(...
+                        objects{i}, ...
+                        object_vars, ...
+                        object_var_names);
+                end
             end
             
             function part = variables2object(part, vars, var_names)
@@ -97,13 +109,14 @@ classdef OptVariables < Combinable
                     
                     prop = unqiue_props(prop_id);
                     id = prop == var_names;
+                    prop_values = vars(:, id);
                     
-                    if nObj == 1
-                        part.(prop) = vars(:, id);
+                    if nSets == 1
+                        part.(prop) = prop_values;
                     else
                         prop_cell = mat2cell(...
-                            vars(:, id), ...
-                            ones(nObj, 1), ...
+                            prop_values, ...
+                            ones(nSets, 1), ...
                             sum(id));
                         
                         [part.(prop)] = prop_cell{:};
@@ -198,26 +211,26 @@ classdef OptVariables < Combinable
                 brow = 0;
             end
         end
-        function a = get.opt_var(self)
+        function opt_var_id = get.opt_var_id(self)
             
             arr = 1:self.nVar;
-            a = arr(self.optimise);
+            opt_var_id = arr(self.optimise);
         end
-        function a = get.nOpt(self)
+        function nOpt = get.nOpt(self)
             
-            a = sum(self.optimise);
+            nOpt = sum(self.optimise);
         end
-        function a = get.nVar(self)
+        function nVar = get.nVar(self)
             
-            a = numel(self.var);
+            nVar = numel(self.var);
         end
-        function a = get.view(self)
+        function view = get.view(self)
             
             arr = 1:self.nVar;
-            isOpt = ismember(arr, self.opt_var)';
+            isOpt = ismember(arr, self.opt_var_id)';
             arr(isOpt) = 1:self.nOpt;
             arr(~isOpt) = 0;
-            a = table(self.var_names', arr', 'VariableNames', {'name', 'opt_id'});
+            view = table(self.var_names', arr', 'VariableNames', {'name', 'opt_id'});
         end
         function [a, b] = init(self, method, dim)
             
@@ -273,10 +286,10 @@ classdef OptVariables < Combinable
                 v(:,j) = vsens(dFF(:,i));
             end
         end
-        function b = combine_var(self, opt_var)
+        function b = combine_var(self, opt_var_id)
             
-            b = repmat(self.var, size(opt_var, 1), 1);
-            b(:,self.opt_var) = opt_var;
+            b = repmat(self.var, size(opt_var_id, 1), 1);
+            b(:,self.opt_var_id) = opt_var_id;
         end
     end
     

@@ -388,8 +388,8 @@ classdef Aerodynamics
             self.part = part;
             
             if ~isempty(self.viscous_obj)
-                %% TODO: Why is this taking the existing selfect?
-                viscous = Viscous.from_aerodynamics(self, self.viscous_obj);
+                %% TODO: Why is this taking the existing object?
+                viscous = Viscous.from_aerodynamics(self);
                 viscous = viscous.test();
                 cf = viscous.cf;
                 self.viscous_obj = viscous;

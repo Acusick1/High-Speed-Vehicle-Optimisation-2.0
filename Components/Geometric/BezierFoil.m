@@ -34,7 +34,7 @@ classdef BezierFoil < Aerofoil & Bezier
                 obj.set_names(vars);
             end
         end
-        function obj = dogenerate(obj, varargin)
+        function obj = generate(obj, varargin)
             
             switch obj.type
                 case "tc"

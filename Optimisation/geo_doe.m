@@ -38,8 +38,8 @@ candidates = col_sort(1:nCandidates,:);
 
 if nCandidates > nDoe
     
-    opt_var = var(candidates(:,1), var_obj.opt_var);
-    crowd = distancecrowding(opt_var, candidates(:,2),[],'genotype');
+    opt_var_id = var(candidates(:,1), var_obj.opt_var_id);
+    crowd = distancecrowding(opt_var_id, candidates(:,2),[],'genotype');
     col_sort2 = sortrows([candidates(:,1), crowd], 2, 'descend');
 else
     error('Increase constraint tolerance or number of candidates with goemtetric DOE')

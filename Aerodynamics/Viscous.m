@@ -436,12 +436,11 @@ classdef Viscous
     
     methods (Static)
         
-        function obj = from_aerodynamics(aero, obj)
+        function obj = from_aerodynamics(aero)
             %% Create viscous object from existing aerodynamics object
             % Apply fields from existing Aerodynamics obj to Viscous obj
             
-            if nargin < 2 || isempty(obj), obj = Viscous(); end
-            
+            obj = Viscous();
             aero_fn = fieldnames(aero);
             visc_fn = fieldnames(obj);
             

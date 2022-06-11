@@ -14,7 +14,7 @@ classdef Cone < Body
                 obj.angle = angle;
             end
         end
-        function dogenerate(obj)
+        function generate(obj)
             
             yDisc = deg2rad(0:2:180);
             xDisc = (0:0.001:1)';
