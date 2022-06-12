@@ -20,22 +20,24 @@ classdef Body < Geometry
     end
     
     methods
-        function a = get.width(obj)
+        function width = get.width(obj)
             
-            a = max(obj.y(:)) * 2;
+            width = max(obj.y(:)) * 2;
         end
-        function a = get.height(obj)
+        function height = get.height(obj)
             
-            a = max(obj.z(:)) - min(obj.z(:));
+            height = max(obj.z(:)) - min(obj.z(:));
         end
-        function a = get.area(obj)
+        function area = get.area(obj)
 
-            a = trapz(obj.x(:,1), max(obj.y, [], 2)); 
+            area = trapz(obj.x(:,1), max(obj.y, [], 2)); 
         end
-        function a = get.volume(obj)
+        function volume = get.volume(obj)
 
             % Calculates full volume (not half-body)
-            [~,a] = convhull([obj.x(:); obj.x(:)], [obj.y(:); -obj.y(:)], ...
+            [~,volume] = convhull(...
+                [obj.x(:); obj.x(:)],...
+                [obj.y(:); -obj.y(:)], ...
                 [obj.z(:); obj.z(:)]);
         end
     end

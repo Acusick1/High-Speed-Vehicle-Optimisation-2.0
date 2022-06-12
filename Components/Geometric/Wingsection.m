@@ -1,6 +1,6 @@
 classdef Wingsection < Geometry
     
-    properties %(SetObservable)
+    properties
         
         chord
         span
@@ -8,28 +8,18 @@ classdef Wingsection < Geometry
         sections = Aerofoil.get_aerofoil("NACA0006")
         dihedral
         offset = [0 0]
-    end
-    
-    properties
-        
         xDiscMethod (1,1) string {mustBeMember(xDiscMethod,{'Linear', 'Cosine', 'Halfcosine'})} = 'Linear'
         xDisc = 100
         % Set to positive number to discretise wing by target dimension
         yDisc = 0
         nParts
         nPanels
-    end
-    
-    properties (Dependent)
         
-        area
-        taper
-        cbar
-        lead_edge
         lead_sweep
         upper
         lower
-        AR
+        
+        area
         Sref
     end
     
@@ -64,7 +54,7 @@ classdef Wingsection < Geometry
                 aerofoils(i) = aerofoils(i).redist(xnorm);
             end
             
-            LE = self.lead_edge;
+            leading_edge_coords = self.get_lead_edge;
             
             chords = self.chord;
             nChords = numel(chords);
@@ -89,20 +79,19 @@ classdef Wingsection < Geometry
                 aerofoils(nFoil+1:nChords) = aerofoils(end);
             end
             
-            self.nParts = nChords - 1;
-            
-            xu = [aerofoils.xu] .* chords + LE(:,:,1);
+            xu = [aerofoils.xu] .* chords + leading_edge_coords(:,:,1);
             zu = [aerofoils.zu] .* chords;
             
-            xl = [aerofoils.xl] .* chords + LE(:,:,1);
+            xl = [aerofoils.xl] .* chords + leading_edge_coords(:,:,1);
             zl = [aerofoils.zl] .* chords;
             
-            yu_rot = zu .* -sin(di) + LE(:,:,2);
-            yl_rot = zl .* -sin(di) + LE(:,:,2);
+            yu_rot = zu .* -sin(di) + leading_edge_coords(:,:,2);
+            yl_rot = zl .* -sin(di) + leading_edge_coords(:,:,2);
             
-            zu_rot = zu .* cos(di) + LE(:,:,3);
-            zl_rot = zl .* cos(di) + LE(:,:,3);
+            zu_rot = zu .* cos(di) + leading_edge_coords(:,:,3);
+            zl_rot = zl .* cos(di) + leading_edge_coords(:,:,3);
             
+            self.nParts = nChords - 1;
             self.x = self.wrap(xu, xl) + self.offset(1);
             self.y = self.wrap(yu_rot, yl_rot);
             self.z = self.wrap(zu_rot, zl_rot) + self.offset(2);
@@ -114,6 +103,18 @@ classdef Wingsection < Geometry
                 self.nPanels = ones(1, self.nParts);
             end
             
+            for i = numel(self.span):-1:1
+                
+                area(i) = 0.5 * sum(self.chord(i:i+1)) * ... 
+                    self.span(i) * cos(self.dihedral(i));
+            end
+            
+            self.area = area;
+            self.Sref = sum(area);
+            
+            self = self.xyz2points();
+            self = self.get_upper();
+            self = self.get_lower();
             self = self.get_data();
         end
         function a = check(self, id)
@@ -134,7 +135,7 @@ classdef Wingsection < Geometry
             end
         end
         function stag = stagnation(self, U)
-            
+            %% TODO: Clearly not used, delete?
             unorm = self.quad_data.unit_norm;
             mid = ceil(size(unorm, 2)/2);
             
@@ -188,29 +189,35 @@ classdef Wingsection < Geometry
             
             self.sections = self.clean_sections(in);
         end
-        function a = get.lead_edge(self)
+        function self = get_Sref(self)
             
-            xTE = [0 cumsum(self.span .* tan(self.trail_sweep))] + self.chord(1);
-            yTE = [0 cumsum(self.span .* cos(self.dihedral))];
-            zTE = [0 cumsum(self.span .* sin(self.dihedral))];
-            
-            a(:,:,1) = xTE - self.chord;
-            a(:,:,2) = yTE;
-            a(:,:,3) = zTE;
+            area = self.get_area();
+            self.Sref = sum(area);
         end
-        function a = get.lead_sweep(self)
+        function lead_edge_coords = get_lead_edge(self)
+            
+            x = [0 cumsum(self.span .* tan(self.trail_sweep))] + self.chord(1);
+            y = [0 cumsum(self.span .* cos(self.dihedral))];
+            z = [0 cumsum(self.span .* sin(self.dihedral))];
+            
+            lead_edge_coords(:,:,1) = x - self.chord;
+            lead_edge_coords(:,:,2) = y;
+            lead_edge_coords(:,:,3) = z;
+        end
+        function lead_edge_sweep = get_lead_sweep(self)
             %% Leading edge sweep calculation
             
-            x_le = self.lead_edge(:,:,1);
-            diff_le = diff(x_le);
+            lead_edge_coords = self.get_lead_edge();
+            x_lead_edge = lead_edge_coords(:,:,1);
+            diff_le = diff(x_lead_edge);
             hyp = (diff_le.^2 + self.span.^2).^0.5;
             
             neg = diff_le < 0;
             
-            a = acos(self.span./hyp);
+            lead_edge_sweep = acos(self.span./hyp);
             
-            a(neg) = -a(neg);
-            a(diff_le == 0) = 0;
+            lead_edge_sweep(neg) = -lead_edge_sweep(neg);
+            lead_edge_sweep(diff_le == 0) = 0;
         end
         function self = span_disc(self)
             
@@ -314,23 +321,23 @@ classdef Wingsection < Geometry
 %             plot3(x1, y, z1)
 %             plot3(xend, y, zend)
         end
-        function a = get.upper(self)
+        function self = get_upper(self)
             
             p = self.points;
             
             [~,dim,~] = size(p);
             
-            a = p(:,1:dim/2,:);
+            self.upper = p(:,1:dim/2,:);
         end
-        function a = get.lower(self)
+        function self = get_lower(self)
             
             p = self.points;
             
             [~,dim,~] = size(p);
             
-            a = fliplr(p(:,(dim/2)+1:end,:));
+            self.lower = fliplr(p(:,(dim/2)+1:end,:));
         end
-        function a = get.area(self)
+        function a = get_section_areas(self)
             
             for i = numel(self.span):-1:1
                 
@@ -338,24 +345,28 @@ classdef Wingsection < Geometry
                     self.span(i) * cos(self.dihedral(i));
             end
         end
-        function a = get.taper(self)
+        function a = get_taper(self)
             
             a = self.chord(2:end)./self.chord(1:end-1);
         end
-        function a = get.cbar(self)
+        function a = get_cbar(self)
             
-            t = self.taper;
+            t = self.get_taper();
             a = (2/3) * self.chord(1:end-1) .* ((1 + t + (t.^2))./(1 + t));
         end
-        function a = get.AR(self)
+        function aspect_ratio = get_aspect_ratio(self)
             %% TODO: Remove area = 0 partitions
-            a = self.span.^2./self.area;
-            a(isnan(a)) = 0;
+            area = self.get_section_areas();
+            aspect_ratio = self.span.^2./area;
+            aspect_ratio(isnan(aspect_ratio)) = 0;
         end
         function sweep = get_sweep(self, loc)
             
-            sweep = atan(tan(self.trail_sweep) - 4./self.AR * ...
-                (loc - 1) .* (1 - self.taper)./(1 + self.taper));
+            taper = self.get_taper();
+            aspect_ratio = self.get_aspect_ratio();
+            
+            sweep = atan(tan(self.trail_sweep) - 4./aspect_ratio * ...
+                (loc - 1) .* (1 - taper)./(1 + taper));
             sweep(isnan(sweep)) = 0;
         end
         function section = clean_sections(self, section)

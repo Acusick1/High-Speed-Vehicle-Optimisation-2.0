@@ -13,11 +13,11 @@ classdef Aerofoil
         rescale = false 
         conical = false         % 2D shape
         checks                  % Geometric violation parameters
+        data
     end
     
     properties (Dependent)
         
-        data
         % Wrapped aerofoil coordinates from trailing edge to trailing edge
         coords
         area                    % Area of each 2D "panel"
@@ -73,7 +73,7 @@ classdef Aerofoil
                 end
             end
         end
-        function data = get.data(obj)
+        function obj = get_data(obj)
             %% TODO: Should this be get function or just carried out during initialisation?
             %GETDATA calculates important aerofoil attributes from aerofoil
             %coordinates
@@ -98,11 +98,13 @@ classdef Aerofoil
             % Get centre point of each line segment
             centre = (points(1:end-1,:,:) + points(2:end,:,:))/2;
             
-            data.norm = normal;
-            data.mag = mag_norm;
-            data.unit_norm = unit_norm;
-            data.area = line_area;
-            data.centre = centre;
+            d.norm = normal;
+            d.mag = mag_norm;
+            d.unit_norm = unit_norm;
+            d.area = line_area;
+            d.centre = centre;
+            
+            obj.data = d;
         end
         function obj = coords2xz(obj, coords)
             %COORDS2XZ sets upper and lower leading to trailing edge

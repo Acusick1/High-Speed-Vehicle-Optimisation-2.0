@@ -22,7 +22,7 @@ classdef PSO < GlobalOptimisation
     end
     
     methods
-        function obj = PSO(lb, ub, nPop, cost_fun, vio_fun, nFun, max_it)
+        function self = PSO(lb, ub, nPop, cost_fun, vio_fun, nFun, max_it)
             %PSO initialisation
             %   Inputs:
             %   lb, ub - lower and upper boundaries of variables
@@ -32,36 +32,36 @@ classdef PSO < GlobalOptimisation
             %   nFun - number of cost functions to optimise
             %   max_it - maximum number of iterations
             
-            obj.lb = lb(:)';
-            obj.ub = ub(:)';
-            obj.nVar = numel(lb);
-            obj.mut_prob = min(1/obj.nVar, 0.05);
-            obj.nPop = nPop;
-            obj.cost_fun = cost_fun;
+            self.lb = lb(:)';
+            self.ub = ub(:)';
+            self.nVar = numel(lb);
+            self.mut_prob = min(1/self.nVar, 0.05);
+            self.nPop = nPop;
+            self.cost_fun = cost_fun;
             
             %% TODO: Why is this being repeated for every particle? Should be single function like cost_fun
             if nargin >= 5 && ~isempty(vio_fun)
                 
                 if isobject(vio_fun)
                     
-                    obj.vio_fun = repelem(vio_fun, obj.nPop, 1);
+                    self.vio_fun = repelem(vio_fun, self.nPop, 1);
                 else
-                    obj.vio_fun = vio_fun;
+                    self.vio_fun = vio_fun;
                 end
             end
             
-            if nargin >= 6 && ~isempty(nFun), obj.nFun = nFun; end
-            if nargin >= 7 && ~isempty(max_it), obj.max_it = max_it; end
+            if nargin >= 6 && ~isempty(nFun), self.nFun = nFun; end
+            if nargin >= 7 && ~isempty(max_it), self.max_it = max_it; end
             
-            obj.var_size = [obj.nPop, obj.nVar];
-            obj.par_vel = zeros(obj.var_size);
-            obj.penalty = zeros(obj.nPop, 1);
+            self.var_size = [self.nPop, self.nVar];
+            self.par_vel = zeros(self.var_size);
+            self.penalty = zeros(self.nPop, 1);
         end
         
-        function obj = update_cost(obj, i)
+        function self = update_cost(self, i)
             %% TODO: Uncomment when finished testing
             % try
-                [obj.cost, obj.penalty, obj.penalties] = obj.cost_fun(obj.variables);
+                [self.cost, self.penalty, self.penalties] = self.cost_fun(self.variables);
             % catch ME
             %     obj.save_opt(i);
             %     rethrow(ME)
@@ -80,248 +80,248 @@ classdef PSO < GlobalOptimisation
 %                 end
 %             end
         end
-        function obj = init_best(obj)
+        function self = init_best(self)
             
-            fn = fieldnames(obj.best);
+            fn = fieldnames(self.best);
             for i = 1:length(fn)
                 
-                obj.best.(fn{i}) = obj.(fn{i});
+                self.best.(fn{i}) = self.(fn{i});
             end
         end
-        function a = get.fitness(obj)
+        function self = update_position(self, hood_pos)
             
-            cost = obj.cost;
-            pen = obj.penalty;
+            vel = self.par_vel;
+            best_pos = self.best.variables;
+            gBest_pos = self.gBest.variables;
             
-            if isempty(pen)
-                
-                a = cost;
-            else
-                a = cost + max(0, pen);
-            end
-        end
-        function obj = update_position(obj, hood_pos)
-            
-            vel = obj.par_vel;
-            best_pos = obj.best.variables;
-            gBest_pos = obj.gBest.variables;
-            
-            vel = obj.w * vel + ...
-                obj.c1 * rand(obj.var_size).*(best_pos - obj.variables) + ...
-                obj.c2 * rand(obj.var_size).*(gBest_pos - obj.variables);
+            vel = self.w * vel + ...
+                self.c1 * rand(self.var_size).*(best_pos - self.variables) + ...
+                self.c2 * rand(self.var_size).*(gBest_pos - self.variables);
             
             if nargin >= 2 && ~isempty(hood_pos)
                 
                 vel = vel + ...
-                    obj.c3 * rand(obj.var_size).*(hood_pos - obj.variables);
+                    self.c3 * rand(self.var_size).*(hood_pos - self.variables);
             end
             
-            if ~isempty(obj.max_vel)
+            if ~isempty(self.max_vel)
                 
-                con1 = vel > obj.max_vel;
-                con2 = vel < -obj.max_vel;
+                con1 = vel > self.max_vel;
+                con2 = vel < -self.max_vel;
                 
-                vel(con1) = obj.max_vel(con1);
-                vel(con2) = -obj.max_vel(con2);
+                vel(con1) = self.max_vel(con1);
+                vel(con2) = -self.max_vel(con2);
             end
             
-            obj.variables = obj.variables + vel;
-            obj.par_vel = vel;
-            obj = obj.bound();
+            self.variables = self.variables + vel;
+            self.par_vel = vel;
+            self = self.bound();
         end
-        function obj = update_best(obj, con_tol)
+        function self = update_best(self, con_tol)
             
             if nargin < 2 || isempty(con_tol), con_tol = inf; end
             
-            id = Population.dominance(obj.cost, obj.best.cost, obj.penalty, obj.best.penalty, con_tol);
+            id = Population.dominance(self.cost, self.best.cost, self.penalty, self.best.penalty, con_tol);
             con = id == 1;
             
-            fn = fieldnames(obj.best);
+            fn = fieldnames(self.best);
             for i = 1:length(fn)
                 
-                if ~isempty(obj.(fn{i}))
+                if ~isempty(self.(fn{i}))
                     
-                    obj.best.(fn{i})(con,:) = obj.(fn{i})(con,:);
+                    self.best.(fn{i})(con,:) = self.(fn{i})(con,:);
                 end
             end
         end
-        function obj = update_gBest(obj, e)
+        function self = update_gBest(self, e)
             
             if nargin < 2 || isempty(e), e = 0; end            
             
-            best_id = obj.tournament(obj.best.cost, obj.best.penalty, e);
+            best_id = self.tournament(self.best.cost, self.best.penalty, e);
             
-            fn = fieldnames(obj.best);
+            fn = fieldnames(self.best);
             for i = 1:length(fn)
                 
-                a.(fn{i}) = obj.best.(fn{i})(best_id,:);
+                a.(fn{i}) = self.best.(fn{i})(best_id,:);
             end
             
-            if isempty(obj.gBest) || a.cost < obj.gBest.cost
+            if isempty(self.gBest) || a.cost < self.gBest.cost
                 
-                obj.gBest = a;
+                self.gBest = a;
             end
         end
-        function obj = update_intertia(obj, wc)
+        function self = update_intertia(self, wc)
              
             % Alter inertia based on above counter
             if wc < 2
                 
-                obj.w = min(obj.w * 2, max(obj.wRange));
+                self.w = min(self.w * 2, max(self.wRange));
                 
             elseif wc > 5
                 
-                obj.w = max(obj.w * 0.5, min(obj.wRange));
+                self.w = max(self.w * 0.5, min(self.wRange));
             end
         end
-        function obj = bound(obj)
+        function self = bound(self)
             
-            pos = obj.variables;
+            pos = self.variables;
             
-            [lbMat, ubMat] = obj.bMats();
+            [lbMat, ubMat] = self.bMats();
             
             % Ensure new particle position is within boundaries
             con1 = pos > ubMat;
             con2 = pos < lbMat;
             
             % If not set particle velocity to zero and enforce bounds
-            obj.par_vel(con1 | con2) = 0;
+            self.par_vel(con1 | con2) = 0;
             pos(con1) = ubMat(con1);
             pos(con2) = lbMat(con2);
             
-            obj.variables = pos;
+            self.variables = pos;
         end
-        function a = get.design_view(obj)
+        function self = run_simple(self)
             
-            [a.best, a.gBest] = ...
-                design.from_struct(obj.best, obj.gBest);
-        end
-        function obj = run_simple(obj)
+            [self.variables, self.best.variables] = ...
+                deal(self.init_lhs(self.nPop));
             
-            [obj.variables, obj.best.variables] = ...
-                deal(obj.init_lhs(obj.nPop));
+            self = self.update_cost(0);
             
-            obj = obj.update_cost(0);
-            
-            obj.best.cost = obj.cost;
-            obj.best.penalty = obj.penalty;
+            self.best.cost = self.cost;
+            self.best.penalty = self.penalty;
 
-            obj = obj.update_gBest();
-            obj.hist = obj.gBest;
+            self = self.update_gBest();
+            self.hist = self.gBest;
             
             wc = 0;
             
-            for i = 2:obj.max_it + 1
+            for i = 2:self.max_it + 1
                 
-                obj = obj.update_position();
-                obj = obj.update_cost(i-1);
-                obj = obj.update_best();
-                obj = obj.update_gBest();
+                self = self.update_position();
+                self = self.update_cost(i-1);
+                self = self.update_best();
+                self = self.update_gBest();
                 
-                obj.hist(i,:) = obj.gBest;
+                self.hist(i,:) = self.gBest;
                 
-                if any(i-1 == obj.save_it), obj.save_opt(i-1); end
+                if any(i-1 == self.save_it), self.save_opt(i-1); end
                 
-                if isequaln(obj.hist(i), obj.hist(i-1))
+                if isequaln(self.hist(i), self.hist(i-1))
                     
-                    obj.stall = obj.stall + 1;
+                    self.stall = self.stall + 1;
                     wc = wc + 1;
                 else
-                    obj.stall = 0;
+                    self.stall = 0;
                     wc = max(0, wc - 1);
                 end
                 
-                obj = obj.update_intertia(wc);
+                self = self.update_intertia(wc);
                 
-                if obj.verbose
+                if self.verbose
                     
-                    fprintf('Iteration %i: f(x): %4.2f p(x): %4.2f\n', i-1, obj.gBest.cost, obj.gBest.penalty);
+                    fprintf('Iteration %i: f(x): %4.2f p(x): %4.2f\n', i-1, self.gBest.cost, self.gBest.penalty);
                 end
             end
         end
-        function obj = run(obj)
+        function self = run(self)
             %RUN particle swarm optimisation
             
             % Initialise particle variables and particle best variables
             % using Latin hypercube sampling
-            obj.variables = obj.init_lhs(obj.nPop);
-            obj.best.variables = obj.variables;
+            self.variables = self.init_lhs(self.nPop);
+            self.best.variables = self.variables;
             
             % Initialise mutation subset indices
-            sets = obj.subset(3);
+            sets = self.subset(3);
             
             % Initialise particle neighbourhood indices 
-            hood = obj.single_link_neighbour(obj.nPop, 4);
+            hood = self.single_link_neighbour(self.nPop, 4);
             
             % Initial PSO loop
-            obj = obj.update_cost(0);
-            obj = obj.init_best();
-            obj = obj.update_gBest();
-            obj = obj.constraint_tolerance();
+            self = self.update_cost(0);
+            self = self.init_best();
+            self = self.update_gBest();
+            self = self.constraint_tolerance();
             
-            obj.hist = obj.gBest;
+            self.hist = self.gBest;
             
             wc = 0;
             
-            for i = 2:obj.max_it + 1
+            for i = 2:self.max_it + 1
                 
                 tic
                 % Find best fitness/violation value in neighbourhood
-                hood_cost = obj.best.cost(hood);
-                hood_pen = obj.best.penalty(hood);
+                hood_cost = self.best.cost(hood);
+                hood_pen = self.best.penalty(hood);
                 
-                id = obj.tournament(hood_cost, hood_pen, obj.con_tol(i));
+                id = self.tournament(hood_cost, hood_pen, self.con_tol(i));
                 
-                for j = obj.nPop:-1:1
+                for j = self.nPop:-1:1
                     
-                    hood_best_var(j,:) = obj.best.variables(hood(j, id(j)), :);
+                    hood_best_var(j,:) = self.best.variables(hood(j, id(j)), :);
                 end
                 
-                obj = obj.update_position(hood_best_var);
+                self = self.update_position(hood_best_var);
                 
-                obj.variables(sets(:,2), :) =...
-                    obj.uni_mutation(obj.variables(sets(:,2), :));
+                self.variables(sets(:,2), :) =...
+                    self.uni_mutation(self.variables(sets(:,2), :));
                 
-                obj.variables(sets(:,3), :) =...
-                    obj.nonuni_mutation(obj.variables(sets(:,3), :), i-1);
+                self.variables(sets(:,3), :) =...
+                    self.nonuni_mutation(self.variables(sets(:,3), :), i-1);
                 
-                obj = obj.update_cost(i-1);
-                obj = obj.update_best(obj.con_tol(i));
-                obj = obj.update_gBest();
+                self = self.update_cost(i-1);
+                self = self.update_best(self.con_tol(i));
+                self = self.update_gBest();
                 
-                obj.hist(i,:) = obj.gBest;
+                self.hist(i,:) = self.gBest;
                 
-                if any(i-1 == obj.save_it)
+                if any(i-1 == self.save_it)
                 
-                    obj.save_opt(i-1);
+                    self.save_opt(i-1);
                     % Resetting parpool to avoid OOM errors
-                    if ~isempty(gcp('nocreate')) && obj.max_it >= 500
+                    if ~isempty(gcp('nocreate')) && self.max_it >= 500
                         
                         delete(gcp); 
                     end
                 end
                 
-                if isequaln(obj.hist(i), obj.hist(i-1))
+                if isequaln(self.hist(i), self.hist(i-1))
                     
-                    obj.stall = obj.stall + 1;
+                    self.stall = self.stall + 1;
                     wc = wc + 1;
                 else
-                    obj.stall = 0;
+                    self.stall = 0;
                     wc = max(0, wc - 1);
                 end
                 
-                obj = obj.update_intertia(wc);
+                self = self.update_intertia(wc);
                 time = toc;
                 
-                if obj.verbose
+                if self.verbose
                     
-                    fprintf('Iteration %i: f(x): %4.2f p(x): %4.2f e(it): %4.2f t(it): %4.2f\n', i-1, obj.gBest.cost, obj.gBest.penalty, obj.con_tol(i-1), time);
+                    fprintf('Iteration %i: f(x): %4.2f p(x): %4.2f e(it): %4.2f t(it): %4.2f\n', i-1, self.gBest.cost, self.gBest.penalty, self.con_tol(i-1), time);
                 end
                 
-                obj.it = i - 1;
-                if obj.stall >= obj.maxStall, break; end
+                self.it = i - 1;
+                if self.stall >= self.maxStall, break; end
             end
         end
+        function fit = get.fitness(obj)
+            
+            cost = obj.cost;
+            pen = obj.penalty;
+            
+            if isempty(pen)
+                
+                fit = cost;
+            else
+                fit = cost + max(0, pen);
+            end
+        end
+%         function design_view = get.design_view(obj)
+%             
+%             [design_view.best, design_view.gBest] = ...
+%                 Design.from_struct(obj.best, obj.gBest);
+%         end
     end
     
     methods (Static)

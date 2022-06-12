@@ -19,12 +19,8 @@ classdef OptVariables < Combinable
         A
         b
         Aeq
-        beq
-    end
-    properties (Dependent)
-        
+        beq     
         opt_var_id
-        view
     end
     
     methods
@@ -66,6 +62,9 @@ classdef OptVariables < Combinable
                 
                 self.optimise(constant) = false;
                 self.nOpt = sum(self.optimise);
+                
+                arr = 1:self.nVar;
+                self.opt_var_id = arr(self.optimise);
             end
         end
         function objects = builder(self, input_vars, varargin)
@@ -211,20 +210,7 @@ classdef OptVariables < Combinable
                 brow = 0;
             end
         end
-        function opt_var_id = get.opt_var_id(self)
-            
-            arr = 1:self.nVar;
-            opt_var_id = arr(self.optimise);
-        end
-        function nOpt = get.nOpt(self)
-            
-            nOpt = sum(self.optimise);
-        end
-        function nVar = get.nVar(self)
-            
-            nVar = numel(self.var);
-        end
-        function view = get.view(self)
+        function view = get_table_view(self)
             
             arr = 1:self.nVar;
             isOpt = ismember(arr, self.opt_var_id)';

@@ -11,6 +11,7 @@ classdef Flightstate
         delta_q
         Pr
         Uinf
+        Uvec
         Tinf
         rinf
         mu
@@ -28,11 +29,6 @@ classdef Flightstate
         gamma = 1.4;
         R = 287;
         cp = Flightstate.R * Flightstate.gamma/(Flightstate.gamma-1)
-    end
-    
-    properties (Dependent)
-
-        U
     end
     
     methods
@@ -93,6 +89,11 @@ classdef Flightstate
             self.Pr = self.mu .* self.cp./self.kt; % Prandtl number
             self.Uinf = M .* self.a;
             self.q = 0.5 * self.rinf .* self.Uinf.^2;
+            
+            self.Uvec = self.Uinf * ...
+                [cos(self.alpha) * cos(self.beta),...
+                 sin(self.beta), ...
+                 sin(self.alpha)];
         end
         function self = max_shock_angles(self, table)
             
@@ -105,10 +106,6 @@ classdef Flightstate
             
             self.max_delta = angles(1);
             self.max_beta = angles(2);
-        end
-        function a = get.U(self)
-            
-            a = self.Uinf * [cos(self.alpha) * cos(self.beta), sin(self.beta), sin(self.alpha)];
         end
     end
     

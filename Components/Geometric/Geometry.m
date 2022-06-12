@@ -17,58 +17,56 @@ classdef Geometry
     end
     
     methods
-%         function obj = Geometry()
+%         function self = Geometry()
 % 
 %         end
-        function obj = initialise(obj, varargin)
-            
-            obj.update = true;
+        function self = initialise(self, varargin)
+            %% TODO: Relevant? Delete?
+            self.update = true;
         end
-        function a = get.sz(obj)
+        function self = xyz2points(self)
             
-            a = size(obj.z);
-        end
-        function p = get.points(obj)
+            p(:,:,1) = self.x;
+            p(:,:,2) = self.y;
+            p(:,:,3) = self.z;
             
-            p(:,:,1) = obj.x;
-            p(:,:,2) = obj.y;
-            p(:,:,3) = obj.z;
+            self.points = p;
         end
-%         function obj = generate(obj, inputMetaProp, varargin)
+%         function self = generate(self, inputMetaProp, varargin)
 %             
-%             if obj.update || isempty(obj.(inputMetaProp.Name))
+%             if self.update || isempty(self.(inputMetaProp.Name))
 %                 
-%                 obj.update = false;
-%                 obj = obj.generate();
-%                 obj = obj.get_data();
+%                 self.update = false;
+%                 self = self.generate();
+%                 self = self.get_data();
 %                 %% For testing
-%                 % obj.update_plot();
+%                 % self.update_plot();
 %             end
 %         end
-        function obj = get_data(obj)
+        function self = get_data(self)
             
-            qua.id = obj.quad_id(obj.sz);
-            tri.id = obj.tri_id(qua.id);
-            [qua.centre, qua.norm, qua.mag] = obj.quad_norm();
+            qua.id = self.quad_id(size(self.z));
+            tri.id = self.tri_id(qua.id);
+            [qua.centre, qua.norm, qua.mag] = self.quad_norm();
             unorm = qua.norm./qua.mag;
             % Collapsed panels have zero norm & mag therefore NaN
             unorm(isnan(unorm)) = 0;
             qua.unit_norm = unorm;
             
-            tri.area = obj.tri_area(tri.id);
-            qua.area = obj.quad_area(tri.area);
+            tri.area = self.tri_area(tri.id);
+            qua.area = self.quad_area(tri.area);
             
-            obj.quad_data = qua;
-            obj.tri_data = tri;
+            self.quad_data = qua;
+            self.tri_data = tri;
             
             %% TODO: Hack > Fix
-            obj.centre = qua.centre;
+            self.centre = qua.centre;
         end
-        function area = tri_area(obj, id)
+        function area = tri_area(self, id)
             
-            X = obj.x(id);
-            Y = obj.y(id);
-            Z = obj.z(id);
+            X = self.x(id);
+            Y = self.y(id);
+            Z = self.z(id);
             
             Dxy = X(:,1).*(Y(:,2) - Y(:,3)) - X(:,2).*(Y(:,1) - Y(:,3))...
                 + X(:,3).*(Y(:,1) - Y(:,2));
@@ -80,20 +78,20 @@ classdef Geometry
             area = 0.5 * (Dxy.^2 + Dyz.^2 + Dzx.^2).^0.5;
             area(isnan(area)) = 0;
         end
-        function area = quad_area(obj, tri)
+        function area = quad_area(self, tri)
             
-            if nargin < 2, tri = obj.tri_area(); end
+            if nargin < 2, tri = self.tri_area(); end
             
             area = tri(1:2:end) + tri(2:2:end);
-            area = reshape(area, obj.sz-1);
+            area = reshape(area, size(self.z) - 1);
         end
-        function [centre, norm, mag] = tri_norm(obj)
+        function [centre, norm, mag] = tri_norm(self)
             
-            id = obj.tri_id;
+            id = self.tri_id;
             
-            p(:,:,1) = obj.x(id);
-            p(:,:,2) = obj.y(id);
-            p(:,:,3) = obj.z(id);
+            p(:,:,1) = self.x(id);
+            p(:,:,2) = self.y(id);
+            p(:,:,3) = self.z(id);
             
             centre = mean(p, 2);
             
@@ -107,9 +105,10 @@ classdef Geometry
             norm(2:2:end,:,:) = crossmat(vec2(2:2:end,:,:), vec1(2:2:end,:,:));
             mag = magmat(norm);
         end
-        function [centre, norm, mag] = quad_norm(obj)
+        function [centre, norm, mag] = quad_norm(self)
             
-            p = obj.points;
+            self = self.xyz2points();
+            p = self.points;
             
             a = p(1:end-1,1:end-1,:);
             b = p(2:end,1:end-1,:);
@@ -158,20 +157,20 @@ classdef Geometry
             norm = crossmat(vec2, vec1);
             mag = magmat(norm);
         end
-        function obj = get_nose_id(obj)
+        function self = get_nose_id(self)
            %% TODO: Hardcoding, correct nose location?
            % Also centre hack
-            xNorm = obj.x - obj.x(1,:);
+            xNorm = self.x - self.x(1,:);
             xNorm = (xNorm(1:end-1, 1:end-1) + xNorm(1:end-1, 2:end) ...
                   + xNorm(2:end, 1:end-1) + xNorm(2:end, 2:end))/4;
-            obj.nose_id = xNorm < 0.05;
+            self.nose_id = xNorm < 0.05;
         end    
-        function obj = get_nose_rad(obj)
+        function self = get_nose_rad(self)
             %% TODO: Hardcoding, correct nose location?
             % Translating to ensure nose start at (0,0)
-            xInt = obj.x - obj.x(1,:);
-            yInt = obj.y - obj.y(1,:);
-            zInt = obj.z - obj.z(1,:);
+            xInt = self.x - self.x(1,:);
+            yInt = self.y - self.y(1,:);
+            zInt = self.z - self.z(1,:);
             
             dim = size(xInt, 2);
             yNose = zeros(1, dim);
@@ -194,7 +193,7 @@ classdef Geometry
             % Matrix version of issorted, are columns sorted
             con = all(xDiff > 0, 1);
             
-            if obj.conical
+            if self.conical
                 
                 % Assume constant x-distribution in radial dim
                 if con(1)
@@ -221,18 +220,18 @@ classdef Geometry
             rad(isnan(rad)) = 1e-6;
             
             % Radius negative if x-norm is positive
-            neg = obj.quad_data.norm(1,:,1) > 0;
+            neg = self.quad_data.norm(1,:,1) > 0;
             rad(neg) = -rad(neg);
             
             % Since forces etc calculated on panel centre, best to do same
             % with nose radius
-            obj.nose_rad = (rad(1:end-1) + rad(2:end))/2;
+            self.nose_rad = (rad(1:end-1) + rad(2:end))/2;
         end
-        function splot = plot(obj, quad, surf_data, views)
+        function splot = plot(self, quad, surf_data, views)
             
             if nargin < 2 || isempty(quad) || quad
                 
-                data = obj.quad_data;
+                data = self.quad_data;
             end
             
             cx = data.centre(:,:,1);
@@ -270,12 +269,12 @@ classdef Geometry
                 hold on
                 if nargin < 3 || isempty(surf_data)
                     
-                    h(1) = surf(obj.x,obj.y,obj.z,'LineWidth',0.05);
-                    h(2) = surf(obj.x,-obj.y,obj.z,'LineWidth',0.05);
+                    h(1) = surf(self.x,self.y,self.z,'LineWidth',0.05);
+                    h(2) = surf(self.x,-self.y,self.z,'LineWidth',0.05);
                     set(h,'FaceColor',colour,'FaceLighting','flat');%, 'EdgeColor','none');
                 else
-                    h(1) = surf(obj.x, obj.y, obj.z, surf_data);
-                    h(2) = surf(obj.x, -obj.y, obj.z, surf_data);
+                    h(1) = surf(self.x, self.y, self.z, surf_data);
+                    h(2) = surf(self.x, -self.y, self.z, surf_data);
                     set(h,'FaceLighting','flat','EdgeColor','none');
                     % colorbar
                 end
@@ -290,14 +289,14 @@ classdef Geometry
                 hold off
             end
         end
-        function update_plot(obj, varargin)
+        function update_plot(self, varargin)
             
             if ishandle(1)
                 
                 figure(1)
                 hold on
                 clf
-                obj.plot
+                self.plot
             end
         end
     end

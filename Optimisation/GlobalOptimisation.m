@@ -94,11 +94,9 @@ classdef GlobalOptimisation < Optimisation
         function obj = constraint_tolerance(obj, tf, ef)
             % Constrained optimization by ε constrained particle swarm optimizer with ε-level control
             
-            if ~isempty(obj.con_tol), return; end
-                
-            t = obj.max_it + 1;
-            cons = obj.penalty;
-            nCon = size(cons, 2);
+            %% TODO: Why was this here?
+            % if ~isempty(obj.con_tol), return; end
+            
             % Switching condition limited to 500 iterations > set to ef
             % after
             switchIt = min(ceil(obj.max_it/2), 500);
@@ -106,16 +104,15 @@ classdef GlobalOptimisation < Optimisation
             if nargin < 2 || isempty(tf), tf = switchIt; end
             if nargin < 3 || isempty(ef), ef = 0; end
             
-            % Have to set as zero first, otherwise max will be Inf
-            set = isinf(cons);
-            cons(set) = 0;
+            t = obj.max_it + 1;
+            cons = max(obj.penalty(isfinite(obj.penalty)));
             
-            for j = 1:nCon
-                
-                cons(set(:,j), j) = 2 * max(cons(:,j));
+            e = zeros(t, 1) + inf;
+            
+            if isempty(cons)
+                obj.con_tol = e;
+                return
             end
-            
-            e = zeros(t, 1) + ef;
             
             % Needs non-zero value to tend towards
             if ef
@@ -128,12 +125,7 @@ classdef GlobalOptimisation < Optimisation
                 tf = 0.75*tf;
             end
             
-            for j = nCon:-1:1
-                
-                numeric = isfinite(cons(:,j));
-                conj = cons(numeric, j);
-                e(1, j) = 0.5*(mean(conj) + min(conj));
-            end
+            e(1) = 0.5*(mean(cons) + min(cons));
             
             for i = 1:switchIt
                     
@@ -151,9 +143,10 @@ classdef GlobalOptimisation < Optimisation
                     % ei = e0 * (1 - tanh(B * t));
                 end
                 
-                e(i + 1,:) = ei;
+                e(i + 1, :) = ei;
             end
             
+            e(i + 1:end, :) = ef;
             obj.con_tol = e;
         end
     end

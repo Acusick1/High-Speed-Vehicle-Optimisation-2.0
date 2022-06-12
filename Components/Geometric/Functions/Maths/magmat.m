@@ -2,7 +2,8 @@ function magnitudes = magmat(mat, p)
 %MAGMAT Wrapper for vecnorm function when finding magnitude of x, y, z
 %coordinates.
 %   Inputs:
-%   mat - x, y, z matrix specified as nx3 matrix or n x m x 3 matrix
+%   mat - x, y or x, y, z matrix where final dimension signifies is where
+%       magnitude is to be found.
 %   p - p norm, see norm function for more details
 
 dims = size(mat);
@@ -10,7 +11,8 @@ dims = size(mat);
 % If p not specified, assume Euclidean norm
 if nargin < 2 || isempty(p), p = 2; end
 
-if dims(end) ~= 3
+% Allowing x, y and x, y, z inputs
+if ~any(dims(end) == [2 3])
     
     error("Incompatible format, final dimension should equal 3 for an x, y, z matrix")
 end

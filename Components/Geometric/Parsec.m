@@ -110,6 +110,8 @@ classdef Parsec < Aerofoil
             
             obj.zu = zu;
             obj.zl = zl;
+            
+            obj.get_data();
         end
         function obj = set.rlel(obj, val)
             

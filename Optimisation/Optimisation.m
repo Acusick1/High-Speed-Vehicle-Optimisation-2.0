@@ -54,13 +54,13 @@ classdef Optimisation
             ubound = repmat(obj.ub, dim, 1);
             a = unifrnd(lbound, ubound, [dim, obj.nVar]);
         end
-        function a = get.save_it(obj)
+        function save_it = get.save_it(obj)
             
             if isempty(obj.save_dir)
                 
-                a = [];
+                save_it = [];
             else
-                a = 0:ceil(obj.max_it/10):obj.max_it;
+                save_it = 0:ceil(obj.max_it/10):obj.max_it;
             end
         end
         function save_opt(obj, it)

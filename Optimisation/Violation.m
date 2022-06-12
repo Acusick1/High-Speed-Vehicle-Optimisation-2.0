@@ -22,50 +22,50 @@ classdef Violation < Combinable% < handle
     end
     
     methods
-        function obj = Violation(val_min, val_max, scale, description, fun_handle)
+        function self = Violation(val_min, val_max, scale, description, fun_handle)
             %% Constructor
             if nargin > 0
                 
-                obj.val_min = val_min(:)';
-                obj.val_max = val_max(:)';
+                self.val_min = val_min(:)';
+                self.val_max = val_max(:)';
                 
                 n = numel(val_min);
                 
-                obj.scale = zeros(1, n);
-                obj.description = string.empty(0, n);
+                self.scale = zeros(1, n);
+                self.description = string.empty(0, n);
                 
                 if nargin < 3 || isempty(scale)
                     
-                    obj.scale = nan(size(val_min));
+                    self.scale = nan(size(val_min));
                 else
-                    obj.scale = scale;
+                    self.scale = scale;
                 end
                 
-                if nargin >= 4, obj.description = description; end
-                if nargin >= 5, obj.fun_handle = fun_handle; end
+                if nargin >= 4, self.description = description; end
+                if nargin >= 5, self.fun_handle = fun_handle; end
                 
-                obj = obj.get_scale();
+                self = self.get_scale();
             end
             
             % addlistener(obj, 'value', 'PostSet', @obj.evaluate);
         end
-        function obj = set.value(obj, val)
+        function self = set.value(self, val)
             
-            obj.value = val;
-            obj = obj.evaluate();
+            self.value = val;
+            self = self.evaluate();
         end
-        function obj = get_scale(obj)
+        function self = get_scale(self)
             % Look for scaling parameter if scaling parameter is empty
-            temp = obj.scale;
+            temp = self.scale;
             
             % Check validity
             rescale = temp == 0 | isnan(temp);
             
             % First option is mean maximum/minimum, then maximum boundary,
             % then minimum boundary
-            minCon = ~isnan(obj.val_min);
-            maxCon = ~isnan(obj.val_max);
-            avg = (obj.val_min + obj.val_max)/2;
+            minCon = ~isnan(self.val_min);
+            maxCon = ~isnan(self.val_max);
+            avg = (self.val_min + self.val_max)/2;
             
             % Check to see if mean can be used as scaling factor
             con = rescale &...
@@ -74,26 +74,26 @@ classdef Violation < Combinable% < handle
             rescale(con) = false;
             
             % Else if max can be used
-            con = rescale & maxCon & obj.val_max ~= 0;
-            temp(con) = obj.val_max(con);
+            con = rescale & maxCon & self.val_max ~= 0;
+            temp(con) = self.val_max(con);
             rescale(con) = false;
             
             % Else if min can be used
-            con = rescale & minCon & obj.val_min ~= 0;
-            temp(con) = obj.val_min(con);
+            con = rescale & minCon & self.val_min ~= 0;
+            temp(con) = self.val_min(con);
             rescale(con) = false;
             
             % Else final option > no rescaling
             temp(rescale) = 1;
             
-            obj.scale = temp;
+            self.scale = temp;
         end
-        function [obj, penalty, penalties] = evaluate(obj)
+        function [self, penalty, penalties] = evaluate(self)
             
-            val = obj.value;
-            mini = obj.val_min;
-            maxi = obj.val_max;
-            sc = obj.scale;
+            val = self.value;
+            mini = self.val_min;
+            maxi = self.val_max;
+            sc = self.scale;
             
             % Impose conditions
             con(1,:) = mini - val;
@@ -107,45 +107,44 @@ classdef Violation < Combinable% < handle
             all = con./sc;
             all(isnan(all)) = [];
 
-            penalty = obj.get_penalty(all);
+            penalty = self.get_penalty(all);
             penalties = all(:)';
             
-            obj.penalty = penalty;
-            obj.penalties = penalties;
+            self.penalty = penalty;
+            self.penalties = penalties;
         end
-        
-        function a = get.view(obj)
+        function view = get.view(self)
             
-            vio = obj.penalties;
+            vio = self.penalties;
             
-            a(length(obj.val_max), :) = struct();
+            view(length(self.val_max), :) = struct();
             
             i = 1;
             for j = 1:length(vio)
                 
                 if mod(j, 2)
                     
-                    if ~isempty(obj.description)
+                    if ~isempty(self.description)
                         
-                        a(i).description = obj.description(i);
+                        view(i).description = self.description(i);
                     end
                     
-                    con = obj.val_min(i);
+                    con = self.val_min(i);
                     
                     if ~isnan(con)
                         
-                        a(i).val_minVio = vio(j);
-                        a(i).val_min = con;
+                        view(i).val_minVio = vio(j);
+                        view(i).val_min = con;
                     end
                     
-                    a(i).value = obj.value(i);
+                    view(i).value = self.value(i);
                 else
-                    con = obj.val_max(i);
+                    con = self.val_max(i);
                    
                     if ~isnan(con)
                         
-                        a(i).val_max = con;
-                        a(i).val_maxVio = vio(j);
+                        view(i).val_max = con;
+                        view(i).val_maxVio = vio(j);
                     end
                     
                     i = i + 1;

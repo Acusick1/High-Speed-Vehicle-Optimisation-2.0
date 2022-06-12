@@ -29,16 +29,17 @@ classdef Viscous
         qwall
         max_Twall
         cf
+        
+        Cf
+        Re_x       % Characteristic length (for Re_x: distance along stream)
+        Taw     % Adiabatic wall temperature
     end
     
     properties (Dependent)
         
-        Cf
-        x       % Characteristic length (for Re_x: distance along stream)
         T0      % Stagnation temperature
         Uinf
         r       % Recovery factor
-        Taw     % Adiabatic wall temperature
         Re_T    % Transition reynolds
     end
     
@@ -52,6 +53,9 @@ classdef Viscous
     end
     
     methods
+        function self = Viscous()
+            %% TODO: Implement this, set constant values to remove remaining get functions
+        end
         function self = test(self)
             
             dim = size(self.Tedge);
@@ -61,7 +65,7 @@ classdef Viscous
                 self.turbulent = true(dim);
             end
             % Adiabatic wall condition
-            % Tw = self.Taw(1,:);
+            % Tw = self.get_Taw(1,:);
             
             % Cold wall condition
             Tw = zeros(dim);
@@ -80,6 +84,8 @@ classdef Viscous
                 self.Tedge(set) = min(self.Tedge(~set));
                 self.rho(set) = min(self.rho(~set));
             end
+            
+            self.Re_x = self.get_Re_x();
             
             % [self.cf, q, self.Re] = obj.eckert(Tw);
             
@@ -109,8 +115,8 @@ classdef Viscous
                 catch
                     Tw(self.part.data.area == 0) = 0;
                 end
-                %con = Tw > self.Taw | ~isfinite(Tw) | imag(Tw) > 0;
-                %Tw(con) = self.Taw(con);
+                %con = Tw > self.get_Taw | ~isfinite(Tw) | imag(Tw) > 0;
+                %Tw(con) = self.get_Taw(con);
                 
                 if i > 1
                     %% TODO: Leading edge instability
@@ -128,6 +134,7 @@ classdef Viscous
             
             self.qwall = q;
             self.max_Twall = max(Tw(:));
+            self.Cf = self.get_Cf();
         end
         function [cf_star, q, Re_star_x] = eckert(self, Tw)
             
@@ -167,7 +174,7 @@ classdef Viscous
             mu_star = self.mu * ((T_star/self.Tinf).^1.5) .* ...
                 (self.Tinf + self.S)./(T_star + self.S);
             
-            Re_star_x = (rho_star .* Ve .* self.x)./mu_star; 
+            Re_star_x = (rho_star .* Ve .* self.Re_x)./mu_star; 
             Re_star_x(Re_star_x < 1) = 0;
             
             % Accurate up to Re 10^9 according to 
@@ -198,8 +205,8 @@ classdef Viscous
             % Thermoelastic Formulation of a Hypersonic Vehicle Control Surface for Control-Oriented Simulation
             % Anderson2006 p286 (but stated as qw)
             St_star = 0.5 * cf_star * self.Pr^(-2/3);
-            % q = redge .* Ve .* St_star .* (self.Taw - Tw) * self.cp;
-            q = rho_star .* Ve .* St_star .* (self.Taw - Tw) * self.cp;
+            % q = redge .* Ve .* St_star .* (self.get_Taw - Tw) * self.cp;
+            q = rho_star .* Ve .* St_star .* (self.get_Taw - Tw) * self.cp;
             
             % Can be nan/inf due to zero area panels etc
             con = ~isfinite(cf_star);
@@ -220,7 +227,7 @@ classdef Viscous
             [rows, cols] = size(d);
             qw = zeros(rows, cols);
             
-            con = self.Re < self.Re_T;
+            con = self.Re < self.get_Re_T;
             % Ensures below will work as expected (one true per column)
             % Also ensures that in the work case strip will be set as fully
             % turbulent rather than fully laminar
@@ -235,10 +242,10 @@ classdef Viscous
             row = row - 1;
             
             xt_id = sort((col - 1) * rows + row);
-            xt = self.x(xt_id)';
+            xt = self.Re_x(xt_id)';
             
             qw_lam = lam();
-            qw_turb = turb(self.x - xt);
+            qw_turb = turb(self.Re_x - xt);
             
             qw(con) = qw_lam(con);
             qw(~con) = qw_turb(~con);
@@ -256,16 +263,9 @@ classdef Viscous
                     qw(1,con) = q0(con);
                 else
                     %% TODO: Move to Wingsection
-                    % Altering sweep from partition to panel based (as is
-                    % nose radius)
-                    le_sweep = self.part.lead_sweep;
-                    
-                    for i = numel(le_sweep):-1:1
-                        
-                        temp{i} = repmat(le_sweep(i), 1, self.part.nPanels(i));
-                    end
-                    
-                    le_sweep = [[temp{:}], le_sweep(end), flip([temp{:}])];
+                    % Hacky way to get sweep for upper/lower surfaces
+                    le_sweep = self.part.get_lead_sweep();
+                    le_sweep = le_sweep([1:end end end:-1:1]);
                     
                     % From: Aerothermodynamics of Transatmospheric Vehicles
                     qw(1,con) = (0.5 * q0(con).^2 .* cos(le_sweep(con)).^2 ...
@@ -286,9 +286,9 @@ classdef Viscous
                 if nargin == 1 && ~isempty(row)
                     
                     d = d(row,:);
-                    X = self.x(row,:);
+                    X = self.Re_x(row,:);
                 else
-                    X = self.x;
+                    X = self.Re_x;
                 end
                 
                 M = 3.2;
@@ -326,7 +326,7 @@ classdef Viscous
             end
         end
         
-        function a = get.Re_T(self)
+        function a = get_Re_T(self)
             
             % Source: Three-Dimensional Laminar Boundary-Layer Transition on a Sharp 88 Cone at Mach 10
             a = exp(6.421 * exp(1.209e-4 * self.Medge.^2.641));
@@ -345,9 +345,9 @@ classdef Viscous
                     
                     qw = stagnation(Rn);
                 else
-                    %% TODO: As in simple heating
                     % Hacky way to get sweep for upper/lower surfaces
-                    le_sweep = self.part.lead_sweep([1:end end end:-1:1]);
+                    le_sweep = self.part.get_lead_sweep();
+                    le_sweep = le_sweep([1:end end end:-1:1]);
                     
                     q0 = stagnation(Rn);
                     qfp = lam(1);
@@ -382,12 +382,12 @@ classdef Viscous
             % Calorifically perfect gas: Anderson2006 p276
             T = h / self.cp;
         end
-        function a = get.Cf(self)
+        function Cf = get_Cf(self)
             
             dimensionalise = (self.cf .* self.part.quad_data.area)/self.Aref;
-            a = sum(dimensionalise(:));
+            Cf = sum(dimensionalise(:));
         end
-        function a = get.x(self)
+        function Re_x = get_Re_x(self)
             %% TODO: Move to Geometry
             if self.part.conical
                 
@@ -408,7 +408,7 @@ classdef Viscous
                 end
             end
 
-            a = cumsum(magmat(diff(centre)));
+            Re_x = cumsum(magmat(diff(centre)));
         end
         function a = get.Uinf(self)
             
@@ -418,7 +418,7 @@ classdef Viscous
             
             a = self.Tinf * (1 + (self.gamma - 1)/2 * (self.Minf^2));
         end
-        function a = get.Taw(self)
+        function a = get_Taw(self)
             
             con = self.turbulent;
             

@@ -108,7 +108,9 @@ while cont
         % So if exit == 4, treat same as chord beyond body
         if any(exit == 2) || any(exit == 4) %||attempt > 10
             
-            if wing.lead_sweep(1) < 0
+            lead_sweep = wing.get_lead_sweep();
+            
+            if lead_sweep(1) < 0
                 
                 wing.trail_sweep(1) = wing.trail_sweep(1) * (1 - anchor);
             

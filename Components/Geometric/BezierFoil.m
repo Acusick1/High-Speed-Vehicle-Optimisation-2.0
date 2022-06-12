@@ -64,6 +64,8 @@ classdef BezierFoil < Aerofoil & Bezier
             
             obj.zu = obj.interp(xu, zu);
             obj.zl = obj.interp(xl, zl);
+            
+            obj = obj.get_data();
         end
         function obj = set_names(obj, vars)
             %SET_NAMES defines control point variable names based on size

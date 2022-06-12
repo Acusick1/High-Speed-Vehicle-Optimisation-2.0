@@ -20,48 +20,49 @@ classdef Fuse3d < Body
     end
     
     methods
-        function obj = Fuse3d(length, nc, nd, w, h, Acu, Acl, Ad)
+        function self = Fuse3d(length, nc, nd, w, h, Acu, Acl, Ad)
             
             if nargin > 0
                 
-                obj.length = length;
+                self.length = length;
                 % Halved as defining half width and upper/lower 
-                obj.w = w * length/2;
-                obj.h = h * length/2;
-                obj.nc = nc;
-                obj.nd = nd;
-                obj.Acu = Acu;
-                obj.Acl = Acl;
-                obj.Ad = Ad;
+                self.w = w * length/2;
+                self.h = h * length/2;
+                self.nc = nc;
+                self.nd = nd;
+                self.Acu = Acu;
+                self.Acl = Acl;
+                self.Ad = Ad;
             end
             
         end
-        function obj = generate(obj)
+        function self = generate(self)
             
-            S = obj.shapefuns;
-            C = obj.classfuns;
+            S = self.get_shapefuns();
+            C = self.get_classfuns();
             
-            y_nd = -S.d .* C.d .* (1 - (2 * obj.yDisc));
-            zu_nd = obj.h(1) * C.cu .* S.cu .* (C.d .* S.d);
-            zl_nd = obj.h(2) * C.cl .* S.cl .* (C.d .* S.d);
+            y_nd = -S.d .* C.d .* (1 - (2 * self.yDisc));
+            zu_nd = self.h(1) * C.cu .* S.cu .* (C.d .* S.d);
+            zl_nd = self.h(2) * C.cl .* S.cl .* (C.d .* S.d);
             
             % Max or max - min as min will always be 0
-            y = y_nd./max(y_nd(:)) * obj.w * obj.length * 0.5;
-            zu = zu_nd./max(zu_nd(:)) * obj.h(1) * obj.length * 0.5;
-            zl = zl_nd./max(-zl_nd(:)) * obj.h(end) * obj.length * 0.5;
+            y = y_nd./max(y_nd(:)) * self.w * self.length * 0.5;
+            zu = zu_nd./max(zu_nd(:)) * self.h(1) * self.length * 0.5;
+            zl = zl_nd./max(-zl_nd(:)) * self.h(end) * self.length * 0.5;
             
-            [y, z] = obj.combine_upper_lower(zu, zl, y);
+            [y, z] = self.combine_upper_lower(zu, zl, y);
             
-            x = obj.xDisc * obj.length;
+            x = self.xDisc * self.length;
             x = repmat(x, 1, size(y, 2));
             
-            [obj.x, obj.y, obj.z] = obj.close_body(x, y, z);
+            [self.x, self.y, self.z] = self.close_body(x, y, z);
             
-            obj.upper = zu;
-            obj.lower = zl;
-            obj = obj.get_data();
+            self.upper = zu;
+            self.lower = zl;
+            self = self.xyz2points();
+            self = self.get_data();
         end
-        function obj = set.Acu(obj, in)
+        function self = set.Acu(self, in)
             %% TODO: Yay or nae (Change to inc_array fun anyway)
             % Can only be slightly below previous
             for i = 2:numel(in)
@@ -72,9 +73,9 @@ classdef Fuse3d < Body
                 end
             end
             
-            obj.Acu = in; 
+            self.Acu = in; 
         end
-        function obj = set.Acl(obj, in)
+        function self = set.Acl(self, in)
             
             % Can only be slightly above previous
             for i = 2:numel(in)
@@ -85,40 +86,17 @@ classdef Fuse3d < Body
                 end
             end
             
-            obj.Acl = in; 
+            self.Acl = in; 
         end
-        function a = check(obj)
+        function out = interp_shape(self, x, y)
             
-            upper_diff = obj.upper(:,2:end) - obj.upper(:,1);
-            lower_diff = -(obj.lower(:,2:end) - obj.lower(:,1));
-            
-            a = [max(upper_diff(:)), max(lower_diff(:)), ...
-                min(obj.nose_rad), obj.height/obj.width];
-        end
-        function a = get.shapefuns(obj)
-            
-            Au = obj.Acu;
-            Al = obj.Acl;
-            
-            a.cu = obj.shapefun([Au, flip(Au)], obj.yDisc);
-            a.cl = obj.shapefun([Al, flip(Al)], obj.yDisc);
-            a.d = obj.shapefun(obj.Ad, obj.xDisc);
-        end
-        function a = get.classfuns(obj)
-            
-            a.cu = obj.classfun(obj.nc(1), obj.yDisc);
-            a.cl = obj.classfun(obj.nc(2), obj.yDisc);
-            a.d = obj.classfun(obj.nd, obj.xDisc);
-        end
-        function out = interp_shape(obj, x, y)
-            
-            funs = obj.shapefuns;
+            funs = self.shapefuns;
             
             if nargin < 1 || isempty(x)
                 
                 out(:,1) = funs.Sd;
             else
-                out(:,1) = interp1(obj.xDisc, funs.Sd, x);
+                out(:,1) = interp1(self.xDisc, funs.Sd, x);
             end
             
             if nargin < 2 || isempty(y)
@@ -126,19 +104,19 @@ classdef Fuse3d < Body
                 out(:,2) = funs.Scu;
                 out(:,3) = funs.Scl;
             else
-                out(:,2) = interp1(obj.yDisc, funs.Scu, y);
-                out(:,3) = interp1(obj.yDisc, funs.Scl, y);
+                out(:,2) = interp1(self.yDisc, funs.Scu, y);
+                out(:,3) = interp1(self.yDisc, funs.Scl, y);
             end
         end
-        function out = interp_class(obj, x, y)
+        function out = interp_class(self, x, y)
             
-            funs = obj.classfuns;
+            funs = self.classfuns;
             
             if nargin < 1 || isempty(x)
                 
                 out(:,1) = funs.Cd;
             else
-                out(:,1) = interp1(obj.xDisc, funs.Cd, x);
+                out(:,1) = interp1(self.xDisc, funs.Cd, x);
             end
             
             if nargin < 2 || isempty(y)
@@ -146,23 +124,46 @@ classdef Fuse3d < Body
                 out(:,2) = funs.Scu;
                 out(:,3) = funs.Scl;
             else
-                out(:,2) = interp1(obj.yDisc, funs.Ccu, y);
-                out(:,3) = interp1(obj.yDisc, funs.Ccl, y);
+                out(:,2) = interp1(self.yDisc, funs.Ccu, y);
+                out(:,3) = interp1(self.yDisc, funs.Ccl, y);
             end
         end
-        function plotbody(obj)
+        function a = check(self)
             
-            Geometry.plotter(obj)
+            upper_diff = self.upper(:,2:end) - self.upper(:,1);
+            lower_diff = -(self.lower(:,2:end) - self.lower(:,1));
+            
+            a = [max(upper_diff(:)), max(lower_diff(:)), ...
+                min(self.nose_rad), self.height/self.width];
+        end
+        function a = get_shapefuns(self)
+            
+            Au = self.Acu;
+            Al = self.Acl;
+            
+            a.cu = self.shapefun([Au, flip(Au)], self.yDisc);
+            a.cl = self.shapefun([Al, flip(Al)], self.yDisc);
+            a.d = self.shapefun(self.Ad, self.xDisc);
+        end
+        function a = get_classfuns(self)
+            
+            a.cu = self.classfun(self.nc(1), self.yDisc);
+            a.cl = self.classfun(self.nc(2), self.yDisc);
+            a.d = self.classfun(self.nd, self.xDisc);
+        end
+        function plotbody(self)
+            
+            Geometry.plotter(self)
             figure(gcf)
             hold on
             title(sprintf(...
-                "NC = [%.2f, %.2f], ND = [%.2f, %.2f]", obj.nc, obj.nd));
+                "NC = [%.2f, %.2f], ND = [%.2f, %.2f]", self.nc, self.nd));
             hold off
         end
-        function plotcurves(obj)
+        function plotcurves(self)
             
-            S = obj.shapefuns;
-            C = obj.classfuns;
+            S = self.get_shapefuns;
+            C = self.get_classfuns;
             
             y = -S.d .* C.d;
             zu = C.cu .* S.cu;
@@ -173,9 +174,9 @@ classdef Fuse3d < Body
             zspare = zeros(size(zu));
             figure(gcf)
             hold on
-            plot3(obj.xDisc, -y, yspare)
-            plot3(zspare, obj.yDisc-0.5, zu)
-            plot3(zspare, obj.yDisc-0.5, zl)
+            plot3(self.xDisc, -y, yspare)
+            plot3(zspare, self.yDisc-0.5, zu)
+            plot3(zspare, self.yDisc-0.5, zl)
             hold off
         end
     end

@@ -17,7 +17,7 @@ classdef MOPSO < PSO
             obj = obj.update_cost(0);
             obj = obj.constraint_tolerance();
             
-            e = obj.con_tol(1,:);
+            e = obj.con_tol(1);
             
             obj = obj.update_PF(e);
             
@@ -56,12 +56,23 @@ classdef MOPSO < PSO
                 
                 obj = obj.update_cost(i-1);
                 
-                e = obj.con_tol(i,:);
+                if isinf(obj.con_tol(i))
+                    obj = obj.constraint_tolerance();
+                end
+                
+                e = obj.con_tol(i);
+                
                 obj = obj.update_PF(e);
                 
-                % distance = Population.crowding(obj.PF.cost);
-                distance = distancecrowding([],obj.PF.cost);
+                if size(obj.PF.variables, 1) == 1
+                    distance = inf;
+                else
+                    distance = distancecrowding([],obj.PF.cost);
+                    % distance = Population.crowding(obj.PF.cost);
+                end
+                
                 best_id(1) = obj.roulette(obj.PF.nDom);
+                
                 %% TODO: CHECK THIS < EXTREMES HAVE DISTANCE = INF??
                 best_id(2) = obj.roulette(distance, true);
                 % best_id(2) = obj.roulette(obj.PF.nDom, true);

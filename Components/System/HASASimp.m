@@ -11,6 +11,7 @@ classdef HASASimp
         lambda_mid % Mid-chord sweep angle
         t_c % Wing thickness to chord ratio
         lambda % Wing taper ratio
+        AR % Wing aspect ratio
         
         % Propulsion
         Aratio  = 0; % Rocket expansion ratio
@@ -66,7 +67,6 @@ classdef HASASimp
     
     properties (Dependent)
         
-        AR % Wing aspect ratio
         mass_kg
     end
     
@@ -119,7 +119,7 @@ classdef HASASimp
             
             % Doubling for half-body
             obj.span = 2 * sum(w.span) * obj.m_ft_conv; % Wing span (ft)
-            obj.Sref = 2 * sum(w.area) * obj.m_ft_conv^2;
+            obj.Sref = 2 * w.Sref * obj.m_ft_conv^2;
             
             sections = [w.sections];
             % Already non-dimensionalised (t/c)
@@ -128,7 +128,9 @@ classdef HASASimp
             % Mean? Weighted mean? See shuttle
             obj.lambda_mid  = mean(w.get_sweep(0.5)); % Mid-chord sweep angle
             obj.t_c         = mean(max_t); % Wing thickness to chord ratio
-            obj.lambda      = mean(w.taper); % Wing taper ratio
+            obj.lambda      = mean(w.get_taper()); % Wing taper ratio
+            obj.AR          = obj.span^2/obj.Sref;
+            
         end
         function obj = get_payload(obj)
             
@@ -323,15 +325,6 @@ classdef HASASimp
             % Can be nan due to div by 0 for unknown fuel densities
             in(isnan(in)) = 0;
             obj.Vfuel = in;
-        end
-        function a = get.AR(obj)
-            
-            if obj.Sref
-                
-                a = obj.span^2/obj.Sref;
-            else
-                a = 0;
-            end
         end
         function a = get.mass_kg(obj)
             

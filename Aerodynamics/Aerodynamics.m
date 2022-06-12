@@ -286,7 +286,7 @@ classdef Aerodynamics
             
             f = self.flow;
             
-            Unorm = f.U/f.Uinf;
+            Unorm = f.Uvec/f.Uinf;
             
             if isa(part, 'Aerofoil')
                 
@@ -756,7 +756,7 @@ classdef Aerodynamics
         end
         function [self, tang, surf] = surface_velocity(self, unorm, normalise)
             
-            tang = crossmat(unorm, self.flow.U);
+            tang = crossmat(unorm, self.flow.Uvec);
             surf = crossmat(tang, unorm);
             
             self.Vedge = surf;
