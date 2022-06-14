@@ -397,7 +397,7 @@ joint = nan(nLines, 3);
 surf_id = zeros(nLines, 2);
 seg_id = zeros(nLines, 1);
 
-data = surface.quad_data;
+data = surface.data;
 [s1, s2, ~] = size(data.centre);
 tri_id = surface.tri_data.id;
 

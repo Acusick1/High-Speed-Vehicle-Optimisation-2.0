@@ -288,16 +288,9 @@ classdef Aerodynamics
             
             Unorm = f.Uvec/f.Uinf;
             
-            if isa(part, 'Aerofoil')
-                
-                data = part.data;
-                unit_norm = data.unit_norm;
-                area = data.area;
-            else
-                data = part.quad_data;
-                unit_norm = data.norm./data.mag;
-                area = data.area;
-            end
+            data = part.data;
+            unit_norm = data.unit_norm;
+            area = data.area;
             
             dim = size(area);
             
@@ -388,7 +381,7 @@ classdef Aerodynamics
             self.part = part;
             
             if ~isempty(self.viscous_obj)
-                %% TODO: Why is this taking the existing object?
+
                 viscous = Viscous.from_aerodynamics(self);
                 viscous = viscous.test();
                 cf = viscous.cf;
@@ -397,8 +390,8 @@ classdef Aerodynamics
                 cf = [];
             end
             
-            self.force_coeffs = ForceCoeffs(data, self.Cp, cf, f.alpha, self.Aref);
-            self.forces = Forces(self.force_coeffs, f, self.Aref);
+            self.force_coeffs = ForceCoeffs(self.Cp, cf, area, unit_norm, f.alpha, self.Aref);
+            self.forces = Forces(self.force_coeffs, f.q, self.Aref);
         end
         function self = method_switcher(self, methods, id)
             

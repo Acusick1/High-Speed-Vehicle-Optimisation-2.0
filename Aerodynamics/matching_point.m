@@ -1,4 +1,5 @@
 function [match_del, match_mach] = matching_point(gamma, Pinf_P0)
+%% TODO: match_del not implemented anywhere, should be used as a switch with Aerodynamics?
 %MATCHING_POINT calculates point to switch from Newtonian to Prandtl-Meyer
 %   Find point (inclination angle and Mach number) at which Prandtl-Meyer 
 %   and Newtonian calculated pressures are equal
@@ -11,11 +12,16 @@ wrapper_fun = @(Mq) fun(Mq, gamma);
 
 M = bisection(wrapper_fun, 1.1 , 1.75, Pinf_P0);
 
-Q = ((2./(2+(gamma-1).*(M.^2))).^(gamma/(gamma-1)));
-P = Q.*(1-(((gamma^2).*(M.^4).*Q)./(4*((M.^2)-1).*(1-Q))));
-
-match_mach = M;
-match_del = asin(((Q-P)/(1-P))^0.5);
+if ~isnan(M)
+    Q = ((2./(2+(gamma-1).*(M.^2))).^(gamma/(gamma-1)));
+    P = Q.*(1-(((gamma^2).*(M.^4).*Q)./(4*((M.^2)-1).*(1-Q))));
+    
+    match_mach = M;
+    match_del = asin(((Q-P)/(1-P))^0.5);
+else
+    match_mach = inf;
+    match_del = inf;
+end
 
 %% OLD METHOD from super-hypersonic arbitrary-body program 1970
 % % Initial guesses

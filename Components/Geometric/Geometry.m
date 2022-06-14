@@ -9,7 +9,7 @@ classdef Geometry
         centre
         sz
         tri_data
-        quad_data
+        data
         update = true
         vio
         nose_rad
@@ -43,8 +43,9 @@ classdef Geometry
 %                 % self.update_plot();
 %             end
 %         end
-        function self = get_data(self)
-            
+        function [self, qua] = get_data(self)
+            %% TODO: What to do about triangular data?
+            %% TODO: Should this return object or data?
             qua.id = self.quad_id(size(self.z));
             tri.id = self.tri_id(qua.id);
             [qua.centre, qua.norm, qua.mag] = self.quad_norm();
@@ -56,7 +57,7 @@ classdef Geometry
             tri.area = self.tri_area(tri.id);
             qua.area = self.quad_area(tri.area);
             
-            self.quad_data = qua;
+            self.data = qua;
             self.tri_data = tri;
             
             %% TODO: Hack > Fix
@@ -220,7 +221,7 @@ classdef Geometry
             rad(isnan(rad)) = 1e-6;
             
             % Radius negative if x-norm is positive
-            neg = self.quad_data.norm(1,:,1) > 0;
+            neg = self.data.norm(1,:,1) > 0;
             rad(neg) = -rad(neg);
             
             % Since forces etc calculated on panel centre, best to do same
@@ -231,7 +232,7 @@ classdef Geometry
             
             if nargin < 2 || isempty(quad) || quad
                 
-                data = self.quad_data;
+                data = self.data;
             end
             
             cx = data.centre(:,:,1);
@@ -377,7 +378,7 @@ classdef Geometry
                 if ~isempty(varargin{i})
                     
                     obj = varargin{i};
-                    data = obj.quad_data;
+                    data = obj.data;
                     cx = data.centre(:,:,1);
                     cy = data.centre(:,:,2);
                     cz = data.centre(:,:,3);

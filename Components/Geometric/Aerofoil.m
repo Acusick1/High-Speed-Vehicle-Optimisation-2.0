@@ -71,9 +71,11 @@ classdef Aerofoil
                         
                     obj = obj.coords2xz(coords);
                 end
+                
+                obj = obj.get_data();
             end
         end
-        function obj = get_data(obj)
+        function [obj, d] = get_data(obj)
             %% TODO: Should this be get function or just carried out during initialisation?
             %GETDATA calculates important aerofoil attributes from aerofoil
             %coordinates
@@ -445,7 +447,7 @@ classdef Aerofoil
             end
             if nargin < 2 || isempty(path)
                 
-                path = fullfile(get_base_path(), 'Configs', 'Geometric', 'DataFiles');
+                path = fullfile(get_base_path(), 'Components', 'Geometric', 'DataFiles');
             end
             
             % Get files within path, extract all names
@@ -457,7 +459,6 @@ classdef Aerofoil
             file_names = file_names(...
                 contains(file_names, pattern, 'IgnoreCase', true));
             
-            aerofoil = [];
             for i = numel(file_names):-1:1
                 
                 fid = fopen(fullfile(path, file_names(i)), 'r');

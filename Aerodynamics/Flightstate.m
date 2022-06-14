@@ -23,6 +23,11 @@ classdef Flightstate
         kt          % Thermal conductivity
         a           % Local speed of sound        
         q           % Dynamic pressure
+        
+        % Table of maximum shockwave and deflection angles for range of 
+        % Mach numbers
+        max_theta_beta_mach
+        
         max_beta    % Max weak shockwave angle for freestream Mach number
         max_delta   % Max deflection angle for freestream Mach number
     end
@@ -121,6 +126,7 @@ classdef Flightstate
             [~, table] = theta_beta_mach_curves();
             [~, angles] = halfspace(self.Minf, table);
             
+            self.max_theta_beta_mach = table;
             self.max_delta = angles(1);
             self.max_beta = angles(2);
         end

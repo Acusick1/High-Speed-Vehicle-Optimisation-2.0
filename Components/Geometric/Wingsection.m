@@ -136,7 +136,7 @@ classdef Wingsection < Geometry
         end
         function stag = stagnation(self, U)
             %% TODO: Clearly not used, delete?
-            unorm = self.quad_data.unit_norm;
+            unorm = self.data.unit_norm;
             mid = ceil(size(unorm, 2)/2);
             
             del = asin(dotmat(-U, unorm(1,:,:)));

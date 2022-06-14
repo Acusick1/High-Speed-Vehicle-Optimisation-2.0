@@ -2,37 +2,40 @@ classdef ForceCoeffs < Combinable
     
     properties
         
-        Cl
-        Cdp
-        Cm
-        CN
-        CA
-        Cf
-        Cd
-        Cl_Cd
+        Cl      % Lift coefficient
+        Cdp     % Inviscid pressure drag coefficient
+        Cm      % Pitching moment coefficient
+        CN      % Normal coefficient
+        CA      % Axial coefficient
+        Cf      % Friction drag coefficient
+        Cd      % Overall drag coefficient
     end
     
     methods
         
-        function obj = ForceCoeffs(data, Cp, Cf, alpha, Aref)
-            
+        function obj = ForceCoeffs(Cp, Cf, area, unit_norm, alpha, Aref)
+            %FORCECOEFFS constructor
+            %   Inputs:
+            %   Cp - inviscid pressure coefficient per panel [NxM]
+            %   Cf - viscous pressure coefficient per panel [NxM]
+            %   area - panel areas [NxM]
+            %   unit_norm - panel unit normals [NxMx3]
+            %   alpha - angle of attack (rad)
+            %   Aref - reference area (m^2)
             if nargin > 0
                 
+                % Angles between body and inertial NED axes
                 xyAngle = alpha;
                 xzAngle = 0;
                 yzAngle = pi/2 - alpha;
-                
-                area = data.area;
-                unit_norm = data.unit_norm;
-                
-                %%
+
                 nx = unit_norm(:,:,1);
                 ny = unit_norm(:,:,2);
                 nz = unit_norm(:,:,3);
                 
-                % Part aerodynamic characteristics
-                % Development of an Aerodynamics Code for the Optimisation of
-                % Hypersonic Vehicles
+                %% Create temporary unnormalised object
+                % Aerodynamic characteristics
+                % Development of an Aerodynamics Code for the Optimisation of Hypersonic Vehicles
                 f.Cl = -((Cp .* area .* nx) * sin(xyAngle)) -...
                     ((Cp .* area .* ny) * sin(xzAngle)) -...
                     ((Cp .* area .* nz) * sin(yzAngle));
@@ -50,12 +53,10 @@ classdef ForceCoeffs < Combinable
                     f.CA = -(Cp + Cf) .* area .* nx;
                 end
                 
-                % f.Cm = -(Cp .* area .* nx) + (Cp .* area .* nz);
                 f.CN = -Cp .* area .* nz;
-                % f.CA = -Cp .* area .* nx;
                 f.Cm = f.CA - f.CN;
                 
-                %% Sum and normalise coefficients
+                %% Sum and normalise coefficients to ForceCoeffs object
                 fn = fieldnames(f);
                 
                 for i = 1:numel(fn)

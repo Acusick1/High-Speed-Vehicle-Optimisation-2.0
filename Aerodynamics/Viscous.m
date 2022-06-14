@@ -110,11 +110,7 @@ classdef Viscous
                 Tw = real(((q - 0)./(self.eps * self.STF) + self.Tinf.^4).^0.25);
                 
                 %% TODO: CLEAN
-                try
-                    Tw(self.part.quad_data.area == 0) = 0;
-                catch
-                    Tw(self.part.data.area == 0) = 0;
-                end
+                Tw(self.part.data.area == 0) = 0;
                 %con = Tw > self.get_Taw | ~isfinite(Tw) | imag(Tw) > 0;
                 %Tw(con) = self.get_Taw(con);
                 
@@ -384,7 +380,9 @@ classdef Viscous
         end
         function Cf = get_Cf(self)
             
-            dimensionalise = (self.cf .* self.part.quad_data.area)/self.Aref;
+            part_area = self.part.data.area;
+             
+            dimensionalise = (self.cf .* part_area)/self.Aref;
             Cf = sum(dimensionalise(:));
         end
         function Re_x = get_Re_x(self)

@@ -110,7 +110,7 @@ classdef HASASimp
 
             obj.Dbe = b.width * obj.m_ft_conv;
             obj.Lb = b.length * obj.m_ft_conv;
-            obj.Sbtot = 2 * sum(b.quad_data.area(:)) * obj.m_ft_conv^2;
+            obj.Sbtot = 2 * sum(b.data.area(:)) * obj.m_ft_conv^2;
             obj.Vtot = b.volume / obj.vol_conv;
         end
         function obj = wing_data(obj, w)
