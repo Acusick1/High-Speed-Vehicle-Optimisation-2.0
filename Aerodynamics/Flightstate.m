@@ -23,19 +23,24 @@ classdef Flightstate
         kt          % Thermal conductivity
         a           % Local speed of sound        
         q           % Dynamic pressure
+        T0          % Stagnation temperature
+        r           % Recovery factor [laminar, turbulent]
         
         % Table of maximum shockwave and deflection angles for range of 
         % Mach numbers
         max_theta_beta_mach
         
         max_beta    % Max weak shockwave angle for freestream Mach number
-        max_delta   % Max deflection angle for freestream Mach number
+        max_del     % Max deflection angle for freestream Mach number
     end
     
     properties (Constant)
         
         gamma = 1.4;
+        STF = 5.67e-8;  % Stefan-Boltzman constant
         R = 287;
+        S = 110         % Sutherland's constant
+        eps = 0.8       % Emissivity
         cp = Flightstate.R * Flightstate.gamma/(Flightstate.gamma-1)
     end
     
@@ -87,7 +92,6 @@ classdef Flightstate
                 end
             end
         end
-        
         function self = get_atmospheric_values(self)
             %GET_ATMOSPHERIC_VALUES derives necessary atmospheric
             %properties used in aerodynamic calculations
@@ -112,13 +116,24 @@ classdef Flightstate
             [self.delta_q, self.Mach_q] = matching_point(g, Pinf_P0);
             
             self.Pr = self.mu .* self.cp./self.kt; % Prandtl number
+            % Recovery factor for laminar and turbulent boundary layers
+            self.r = [self.Pr^(1/2), self.Pr^(1/3)];
             self.Uinf = M .* self.a;
             self.q = 0.5 * self.rinf .* self.Uinf.^2;
+            % Stagnation temperature
+            self.T0 = self.Tinf * (1 + (g - 1)/2 * (M^2));
             
-            self.Uvec = self.Uinf * ...
-                [cos(self.alpha) * cos(self.beta),...
-                 sin(self.beta), ...
-                 sin(self.alpha)];
+        end
+        function Uvec = get.Uvec(self)
+            % Putting this in a get function as if alpha changes, the
+            % velocity vector must update
+            if ~isempty(self.Uinf)
+                
+                Uvec = self.Uinf * ...
+                    [cos(self.alpha) * cos(self.beta),...
+                     sin(self.beta), ...
+                     sin(self.alpha)];
+            end
         end
         function self = max_shock_angles(self)
             %MAX_SHOCK_ANGLES Defines maximum deflection and shockwave 
@@ -127,7 +142,7 @@ classdef Flightstate
             [~, angles] = halfspace(self.Minf, table);
             
             self.max_theta_beta_mach = table;
-            self.max_delta = angles(1);
+            self.max_del = angles(1);
             self.max_beta = angles(2);
         end
     end

@@ -2,10 +2,12 @@ classdef Aerodynamics
     
     properties
         
-        flow
-        Aref = 1
+        flightstate
+        viscous
+        object
+        
         shield = false
-        delta
+        del
         impact
         shadow
         Cp
@@ -14,20 +16,11 @@ classdef Aerodynamics
         Pedge
         Tedge
         rho
-        force_coeffs
-        forces
-        viscous_obj
+        cf
+        
         max_theta_beta_mach
         cone_table
         vmax
-        dCm_dalpha
-        dCl_dbeta
-        
-        trim = false
-        part
-        weight
-        alpha_opt
-        lateral_stability = true
         
         impact_method = struct(...
             'newtonian', ["nose", "default"], ...
@@ -40,253 +33,157 @@ classdef Aerodynamics
     end
     
     methods
-        function self = Aerodynamics(viscous, trim, states, nParts)
+        function self = InviscidAero(state, viscous)
             
             if nargin > 0
                 
-                temp = Aerodynamics();
+                gamma = state.gamma;
+                self.cone_table = tangent_cone_table(state.Minf, gamma);
+                self.vmax = pi/2 * (((gamma + 1)/(gamma - 1))^0.5 - 1);
+                self.flightstate = state;
                 
-                if nargin > 1 && viscous, temp.viscous_obj = Viscous(); end
-                if nargin < 2 || isempty(trim), trim = false; end
-                
-                temp.trim = trim;
-                [~, temp.max_theta_beta_mach] = theta_beta_mach_curves();
-                
-                if nargin >= 3
+                if nargin >= 2 && ~isempty(viscous)
                     
-                    for i = numel(states):-1:1
-
-                        self(i,:) = temp;
-                        self(i,:) = self(i,:).set_flow(states(i));
-                    end
-                    if nargin >= 4 && ~isempty(nParts)
-                        
-                        self = repelem(self, 1, nParts);
-                    end
-                else
-                    self = temp;
+                    self.viscous = viscous;
                 end
             end
         end
-        function self = set_flow(self, state)
+        function [force_coeffs, forces, out] = trim(...
+                self, Aref, weight, varargin)
+            %TRIM attempts to find the trim angle of attack for an input
+            %vehicle
+            %   This is a simple routine that assumes no control surfaces,
+            %   instead searching for the overall angle of attack at which 
+            %   lift equals weight
+            %
+            %   Inputs:
+            %   Aref - reference area to normalise force coefficients and
+            %       calculate lifting force (m^2)
+            %   weight - vehicle weight, must be in Newtons to compare to
+            %       lifting force (N)
+            %   varargin - objects that make up vehicle
             
-            gamma = state.gamma;
-            self.cone_table = tangent_cone_table(state.Minf, gamma);
-            self.vmax = pi/2 * (((gamma + 1)/(gamma - 1))^0.5 - 1);
-            self.flow = state;
-        end
-        function self = analyse(self, varargin)
+            iter = 0;
+            max_abs_alpha = deg2rad(45);
             
-            [nStates, nParts] = size(self);
+            % Set initial alpha to reasonable trim angle
+            alpha = deg2rad(5);
+            % Initial alpha step, applied positively if lift > weight,
+            % otherwise negative
+            initial_step = deg2rad(5);
+            % Set initial alpha to reasonable trim angle
+            self.flightstate.alpha = alpha;
+            [force_coeffs, forces] = self.run(Aref, varargin{:});
             
-            for i = 1:nStates
+            if isinf(weight)
                 
-                temp = self(i,1);
-                W = temp.weight;
+                out.alpha_opt = inf;
+                out.dCm_dalpha = inf;
+                return
+            end
+            
+            % Trimming loop
+            while true
                 
-                % If next state has same Mach and altitude, do not trim.
-                % Only reason this occurs is if uncertainty is desired in
-                % trim angle. Therefore do not re-trim, just apply 
-                % uncertainty 
-                if i > 1 && temp.trim && temp.flow.Minf == self(i-1,1).flow.Minf
+                lift = forces.L;
+                LW_diff = lift - weight;
+                
+                if iter == 0
                     
-                    temp.trim = false;
+                    alpha = alpha - (sign(LW_diff) * initial_step);
+                else                
+                    % Exit criteria:
+                    %   Trim convergence (lift ~= weight)
+                    %   Angle of attack is not longer changing due to trim 
+                    %   or stuck at min/max alpha floor/ceiling
+                    %   Cannot converge within tolerance
+                    y = [prev_alpha, alpha];
                     
-                    for j = 1:nParts
-
-                        % If vehicle unable to trim, set alpha equal to
-                        % previous for size consistency
-                        try
-                            self(i,j).flow.alpha = t.alpha + ...
-                                temp.flow.alpha;
-                        catch
-                            self(i,j).flow.alpha = self(i-1,j).flow.alpha + ...
-                                temp.flow.alpha;
-                        end
+                    trimmed = abs(LW_diff/((lift + weight)/2)) < 0.01;
+                    alpha_conv = ~diff(round(y, 6));
+                    quit = (iter >= 50 && lift > weight);
+                    
+                    if trimmed || alpha_conv || quit
                         
-                        self(i,j).alpha_opt = self(i-1,j).alpha_opt;
-                        self(i,j).dCm_dalpha = self(i-1,j).dCm_dalpha;
-                        self(i,j).dCl_dbeta = self(i-1,j).dCl_dbeta;
-                    end
-                end
-                
-                t.count = 1;
-                p.Cm = nan;
-                p.alpha = nan;
-                alpha_conv = false;
-                
-                while true
-                    
-                    for j = 1:nParts
+                        % dCm = (Cm - previous.Cm)/(t.alpha - previous.alpha);
+                        dCm = (force_coeffs.Cm - prev_force_co.Cm)/...
+                            (force_coeffs.Cl - prev_force_co.Cl);
                         
-                        geometry = varargin{j};
+                        if isnan(dCm), dCm = 1; end
                         
-                        if ~isempty(geometry)
-                            
-                            self(i,j) = self(i,j).main(geometry);
-                        end
-                    end
-                    
-                    a = self(i,1).flow.alpha;
-                    f = [self(i,:).forces];
-                    fc = [self(i,:).force_coeffs];
-                    lift = sum([f.L]);
-                    Cm = sum([fc.Cm]);
-                    Cl = sum([fc.Cl]);
-                    
-                    if ~temp.trim
+                        out.alpha_opt = self.flightstate.alpha;
+                        out.dCm_dalpha = dCm;
                         break
                     else
+                        %% TODO: Should use a simple line search here
+                        % lift - weight gives a convex problem to be solved
+                        % Currently assuming lift curve slope is rougly 
+                        % linear, interpolating being most recent two runs 
+                        % should always get a closer value
                         
-                        % Trim convergence criteria:
-                        % Actual convergence ie. lift ~= weight,
-                        % Cannot converge within tolerance
-                        trimmed = 0.99 * W < lift && ...
-                            1.01 * W > lift;
-                        
-                        quit = t.count >= 50 && lift > W;
-                        
-                        if t.count > 1 && (trimmed || alpha_conv || quit)
-                            
-                            if t.alpha > p.alpha
-                                
-                                % dCm = (Cm - p.Cm)/(t.alpha - p.alpha);
-                                dCm = (Cm - p.Cm)/(Cl - p.Cl);
-                            else
-                                % dCm = (p.Cm - Cm)/(p.alpha - t.alpha);
-                                dCm = (p.Cm - Cm)/(p.Cl - Cl);
-                            end
-                            
-                            if isnan(dCm), dCm = 1; end
-                            self(i,1).dCm_dalpha = dCm;
-                            
-                            break
-                        else
-                            p.Cm = Cm;
-                            p.Cl = Cl;
-                            p.alpha = self(i,1).flow.alpha;
-                            
-                            [t, alpha_conv] = update_alpha(lift, t);
-                        end
-                        
-                        %% Next loop setup
-                        for j = 1:nParts
-                            
-                            self(i,j).flow.alpha = t.alpha;
-                            self(i,j).alpha_opt = t.alpha;
-                        end
+                        % Interpolating to find alpha at which lift is
+                        % equal to weight
+                        x = [prev_lift, lift];
+                        alpha = vec_interp(x(1), x(2), y(1), y(2), weight);
+                        % Limiting output alpha within min/max bounds
+                        alpha = max(...
+                            min(alpha, max_abs_alpha), ...
+                            -max_abs_alpha);
                     end
                 end
                 
-                %% TODO: Better way of only coming in here for non-uncertainty flight states
-                if temp.lateral_stability && temp.trim
-                    
-                    for j = nParts:-1:1
-                        
-                        side1(i,j) = self(i,j);
-                        side2(i,j) = self(i,j);
-                        side1(i,j).flow.beta = deg2rad(0.5);
-                        side2(i,j).flow.beta = deg2rad(0.5);
-                        
-                        geometry = varargin{j};
-                        
-                        if ~isempty(geometry)
-                            
-                            mirror = geometry;
-                            
-                            mirror.x = flip(mirror.x, 2);
-                            mirror.y = flip(-mirror.y, 2);
-                            mirror.z = flip(mirror.z, 2);
-                            mirror = mirror.get_data;
-                            
-                            side1(i,j) = side1(i,j).main(geometry);
-                            side2(i,j) = side2(i,j).main(mirror);
-                        end
-                    end
-                    
-                    fc1 = [side1(i,:).force_coeffs];
-                    fc2 = [side2(i,:).force_coeffs];
-                    Clb = sum([fc1.Cl] + [fc2.Cl])/2;
-                    
-                    self(i,1).dCl_dbeta = (Clb - Cl)/deg2rad(0.5);
-                end
-            end
-            
-            function [t, conv] = update_alpha(lift, t)
+                % Save previous values
+                prev_force_co = force_coeffs;
+                prev_lift = lift;
+                prev_alpha = self.flightstate.alpha;
                 
-                LWdiff = lift - W;
-                
-                if t.count == 1
-                    
-                    % Can be temp here as only coming in initial instance
-                    t.alpha = temp.flow.alpha;
-                    
-                    if LWdiff > 0
-                        
-                        x = [nan LWdiff];
-                        y = [nan t.alpha];
-                        alpha = t.alpha - deg2rad(5);
-                    else
-                        x = [LWdiff nan];
-                        y = [t.alpha nan];
-                        alpha = t.alpha + deg2rad(5);
-                    end
-                else
-                    alpha = t.alpha;
-                    x = t.x;
-                    y = t.y;
-                    
-                    if t.count == 2
-                        
-                        x(isnan(x)) = LWdiff;
-                        y(isnan(y)) = alpha;
-                    else
-                        %% TODO: Cleaner logic
-                        if (LWdiff < 0 && LWdiff > x(1)) || all(x(1) > [0 LWdiff])
-                            % If new < 0 and > lower bound, or
-                            % lower bound > 0 and new < lower bound
-                            % lower bound = new
-                            x(1) = LWdiff;
-                            y(1) = alpha;
-                              
-                        elseif LWdiff > 0 && LWdiff < x(2) || all(x(2) < [0 LWdiff])
-                            % If new > 0 and < upper bound, or
-                            % upper bound < 0 and new > upper bound
-                            % upper bound = new
-                            x(2) = LWdiff;
-                            y(2) = alpha;
-                        end
-                    end
-                    
-                    alpha = y(1) - (x(1) * (y(2) - y(1))/(x(2) - x(1)));
-                    alpha = max(min(alpha, deg2rad(45)), deg2rad(-45));
-                end
-                
-                % Comparing current and next alphas
-                alphas = [t.alpha, alpha];
-                
-                % If prev and next angle of attack are too high
-                too_steep = all(abs(alphas) > deg2rad(35));
-                % If alpha is barely changing
-                approx_conv = ~diff(round(alphas, 6));
-                
-                conv = too_steep || approx_conv;
-                
-                if ~conv
-                    
-                    t.alpha = alpha;
-                    t.x = x;
-                    t.y = y;
-                end
-                
-                t.count = t.count + 1;
+                % Update alpha and re-run
+                self.flightstate.alpha = alpha;
+                [force_coeffs, forces] = self.run(Aref, varargin{:});
+                iter = iter + 1;
             end
         end
+        
+        function [force_coeffs, forces, all_data] = run(self, Aref, varargin)
+            %RUN wraps the main function to allow multiple objects to be
+            %analysed and aggregated, producing overall vehicle
+            %characteristics
+            for i = numel(varargin):-1:1
+                
+                part = varargin{i};
+                part = part.get_data();
+                
+                aero_part = self.main(part);
+                
+                fco(i) = ForceCoeffs(...
+                    aero_part.Cp, ...
+                    aero_part.cf, ...
+                    part.data.area, ...
+                    part.data.unit_norm, ...
+                    self.flightstate.alpha, ...
+                    Aref);
+                
+                f(i) = Forces(fco(i), self.flightstate.q, Aref);
+                
+                if nargout >= 3
+                    
+                    all_data.aero(i) = aero_part;
+                    all_data.force_co(i) = fco(i);
+                    all_data.forces(i) = f(i);
+                end
+            end
+            
+            force_coeffs = fco.sum();
+            forces = f.sum();
+        end
+        
         function self = main(self, part)
             
-            f = self.flow;
+            self.object = part;
             
-            Unorm = f.Uvec/f.Uinf;
+            state = self.flightstate;
+            
+            Unorm = state.Uvec/state.Uinf;
             
             data = part.data;
             unit_norm = data.unit_norm;
@@ -300,11 +197,11 @@ classdef Aerodynamics
             
             % Sanity check
             if any(isnan(d))
-            
+                
                 error("inclination NaN");
             end
             
-            self.delta = d;
+            self.del = d;
             
             %% Impact zone
             [im, sh, self.Cp, self.Medge, self.Pedge, self.Tedge, self.rho] = ...
@@ -312,16 +209,16 @@ classdef Aerodynamics
             
             [~, ~, iid] = Aerodynamics.get_method(class(part), self.impact_method);
             % Panel faces flow as has non-zero area
-            im(self.delta > 0 & area > 0) = iid;
-
+            im(self.del > 0 & area > 0) = iid;
+            
             % Angle to flow too large for attached shock
             % 99% used to avoid close calls being returned as NaN from
             % get_oblique_shock_angle
-            im(im & self.delta >= f.max_delta * 0.99) = 1;
+            im(im & self.del >= state.max_del * 0.99) = 1;
             
             % Any method other than newtonian requires attached shock
             shock = im > 1;
-            target = tan(self.delta(shock));
+            target = tan(self.del(shock));
             
             % Get shockwave angles, any NaN values should have been dealt
             % with already, but setting to Newtonian just in case
@@ -330,19 +227,19 @@ classdef Aerodynamics
             
             %% Shadow zone
             [~, ~, sid] = Aerodynamics.get_method(class(part), self.shadow_method);
-            sh(self.delta <= 0 & area > 0) = sid;
-
+            sh(self.del <= 0 & area > 0) = sid;
+            
             % For non-conical parts, where the streamwise and
             % x-dimension are assumed to be parallel. First shaded panel
             % results in the rest of the strip being defined as shadow
             % region
             if ~part.conical
-
+                
                 for i = 1:dim(2)
-
+                    
                     id = find(~im(:,i), 1, 'first');
                     if isempty(id), continue; end
-
+                    
                     im(id:end, i) = 0;
                     sh(id:end, i) = sid;
                 end
@@ -350,7 +247,7 @@ classdef Aerodynamics
             
             self.impact = im;
             self.shadow = sh;
-
+            
             self = self.method_switcher(self.impact_method, im);
             
             % Mach_q essentially a placeholder
@@ -358,19 +255,19 @@ classdef Aerodynamics
             % first panel that does not use newtonian
             for i = 1:dim(2)
                 
-                int = self.Medge(:,i) == f.Mach_q | isnan(self.Medge(:,i));
-                a = find(~int, 1);
+                int = self.Medge(:,i) == state.Mach_q | isnan(self.Medge(:,i));
+                row = find(~int, 1);
                 %% TODO: what if purely newtonian?
-                x0 = self.delta(a, i);
-                y0 = self.Medge(a, i);
+                x0 = self.del(row, i);
+                y0 = self.Medge(row, i);
                 
-                if isempty(a) || y0 <= 0    
+                if isempty(row) || y0 <= 0
                     x0 = 0;
-                    y0 = self.flow.Minf;
+                    y0 = self.flightstate.Minf;
                 end
-              
+                
                 x1 = pi/2;
-                xq = self.delta(int, i);
+                xq = self.del(int, i);
                 y1 = 0;
                 
                 self.Medge(int, i) = y0 + (xq - x0).*((y1 - y0)./(x1 - x0));
@@ -378,20 +275,16 @@ classdef Aerodynamics
             
             self = self.method_switcher(self.shadow_method, sh);
             
-            self.part = part;
-            
-            if ~isempty(self.viscous_obj)
-
-                viscous = Viscous.from_aerodynamics(self);
-                viscous = viscous.test();
-                cf = viscous.cf;
-                self.viscous_obj = viscous;
-            else
-                cf = [];
+            %% Run viscous analysis if viscous object supplied
+            if ~isempty(self.viscous)
+                % Copy necessary data from current object for analysis
+                self.viscous = copy_class_properties(...
+                    self, self.viscous);
+                
+                self.viscous = self.viscous.run();
+                % Copying friction coefficient back to main object
+                self.cf = self.viscous.cf;
             end
-            
-            self.force_coeffs = ForceCoeffs(self.Cp, cf, area, unit_norm, f.alpha, self.Aref);
-            self.forces = Forces(self.force_coeffs, f.q, self.Aref);
         end
         function self = method_switcher(self, methods, id)
             
@@ -406,22 +299,15 @@ classdef Aerodynamics
                 end
             end
         end
-        function centre_of_pressure = get_centre_of_pressure(self, centre)
-            
-            xyz_Cp = reshape(centre .* self.Cp, [], 3, 1);
-            sum_Cp = sum(self.Cp(:));
-            
-            centre_of_pressure = xyz_Cp/sum_Cp;
-        end
         function self = newtonian(self, con)
             
-            f = self.flow;
-            % theta = pi/2 - self.delta(con);
-            theta = self.delta(con);
+            state = self.flightstate;
+            % theta = pi/2 - self.del(con);
+            theta = self.del(con);
             
-            Minf = f.Minf;
-            Pinf = f.Pinf;
-            g = f.gamma;
+            Minf = state.Minf;
+            Pinf = state.Pinf;
+            g = state.gamma;
             
             a = 2./(g * Minf.^2);
             b = (((g + 1)^2) * Minf.^2)./((4 * g * Minf.^2) - (2 * (g - 1)));
@@ -435,26 +321,26 @@ classdef Aerodynamics
             
             Vel = magmat(self.Vedge);
             
-            Te = f.Tinf + (f.Uinf^2 - Vel(con).^2)/(2 * f.cp);
+            Te = state.Tinf + (state.Uinf^2 - Vel(con).^2)/(2 * state.cp);
             
-            self.rho(con) = P ./ (f.R * Te);
+            self.rho(con) = P ./ (state.R * Te);
             self.Tedge(con) = Te;
             self.Pedge(con) = P;
-            self.Medge(con) = f.Mach_q * ones(size(theta));
+            self.Medge(con) = state.Mach_q * ones(size(theta));
             
-            % due_dx = f.q/(rhoe * ue) * cos(theta) * sin(theta);
+            % due_dx = state.q/(rhoe * ue) * cos(theta) * sin(theta);
         end
         
         function self = tangent_oblique_shock(self, con)
             
-            theta = self.delta(con);
-            f = self.flow;
+            theta = self.del(con);
+            state = self.flightstate;
             
-            Minf = f.Minf;
-            Pinf = f.Pinf;
-            g = f.gamma;
+            Minf = state.Minf;
+            Pinf = state.Pinf;
+            g = state.gamma;
             
-            beta = self.get_oblique_shock_angle(tan(theta), Minf, f.max_beta);
+            beta = self.get_oblique_shock_angle(tan(theta), Minf, state.max_beta);
             
             % Fundamentals of Aerodynamics, Anderson 2001 & Development of an
             % Aerodynamics Code for the Optimisation of Hypersonic Vehicles Jazra
@@ -465,7 +351,7 @@ classdef Aerodynamics
             denom = g * (Mn1.^2) - (g - 1)/2;
             
             Mn2 = (numer./denom).^0.5;
-
+            
             % Anderson2006 p43
             K = Minf * theta;
             Pratio = 1 + (((g * (g + 1))/4) * K.^2) + (g * K.^2 .* (((g + 1)/4).^2 + (1./(K.^2))).^0.5);
@@ -478,15 +364,15 @@ classdef Aerodynamics
             % M1 = Minf as tangent assumes series of impinging shockwaves
             self.Cp(con) = (1/(0.5 * g * (Minf^2))) * (Pratio - 1);
             self.Pedge(con) = Pratio * Pinf;
-            self.rho(con) = rratio * f.rinf;
+            self.rho(con) = rratio * state.rinf;
             % Eq of state
-            self.Tedge(con) = (Pratio./rratio) * f.Tinf;
+            self.Tedge(con) = (Pratio./rratio) * state.Tinf;
         end
         function self = tangent_cone(self, con)
-
-            theta = self.delta(con);
-            M1 = self.flow.Minf;
-            g = self.flow.gamma;
+            
+            theta = self.del(con);
+            M1 = self.flightstate.Minf;
+            g = self.flightstate.gamma;
             
             % Development of an Aerodynamics Code for the Optimisation of
             % Hypersonic Vehicles - gives M2 > M1
@@ -519,21 +405,21 @@ classdef Aerodynamics
             
             self.Medge(con) = M2;
             self.Cp(con) = sin(theta.^2) .* (1 + (frac1 .* log(frac2)));
-            self.Pedge(con) = Pratio * self.flow.Pinf;
-            self.rho(con) = rratio * self.flow.rinf;
+            self.Pedge(con) = Pratio * self.flightstate.Pinf;
+            self.rho(con) = rratio * self.flightstate.rinf;
             % Eq of state
-            self.Tedge(con) = Pratio./rratio .* self.flow.Tinf;
+            self.Tedge(con) = Pratio./rratio .* self.flightstate.Tinf;
         end
         function self = oblique_shock_prandtl_meyer(self, con)
             
-            f = self.flow;
-            Minf = f.Minf;
-            Pinf = f.Pinf;
-            Tinf = f.Tinf;
-            rinf = f.rinf;
-            g = f.gamma;
+            state = self.flightstate;
+            Minf = state.Minf;
+            Pinf = state.Pinf;
+            Tinf = state.Tinf;
+            rinf = state.rinf;
+            g = state.gamma;
             
-            d = self.delta;
+            d = self.del;
             ddiff = [d(1,:); diff(d)];
             [row, col] = size(ddiff);
             
@@ -563,7 +449,7 @@ classdef Aerodynamics
                     r1 = r2(i-1, :);
                 end
                 
-                newt = ddiff(i,:) * 0.95 > f.max_delta;
+                newt = ddiff(i,:) * 0.95 > state.max_del;
                 shock = ddiff(i,:) > 1e-7 & ~newt;
                 obs = coni & shock;
                 
@@ -644,18 +530,18 @@ classdef Aerodynamics
             self.Tedge = T2;
             self.rho = r2;
             
-            function [Cp2, M2, P2, T2, r2] = oblique_shock(delta, M1, P1, T1, r1)
+            function [Cp2, M2, P2, T2, r2] = oblique_shock(del, M1, P1, T1, r1)
                 
-                delta = delta(:)';
+                del = del(:)';
                 
                 if nargin < 2 || isempty(M1), M1 = Minf; end
                 if nargin < 3 || isempty(P1), P1 = Pinf; end
                 if nargin < 4 || isempty(T1), T1 = Tinf; end
                 if nargin < 5 || isempty(r1), r1 = rinf; end
                 
-                beta = self.get_oblique_shock_angle(tan(delta), M1);
+                beta = self.get_oblique_shock_angle(tan(del), M1);
                 
-                M2 = (1./(sin(beta - delta).^2) .* ...
+                M2 = (1./(sin(beta - del).^2) .* ...
                     ((g - 1) .* M1.^2 .* (sin(beta).^2) + 2)./ ...
                     (2 * g * (M1.^2) .* (sin(beta).^2) - (g - 1))).^0.5;
                 
@@ -696,7 +582,7 @@ classdef Aerodynamics
                 
                 % Anderson p45
                 vMp1 = pm_fun(M1);
-                % Absolute value as delta is relative to flow direction, not
+                % Absolute value as del is relative to flow direction, not
                 % convex/concavity
                 vMp2 = vMp1 + abs(dTheta);
                 
@@ -713,43 +599,43 @@ classdef Aerodynamics
         end
         function beta = get_oblique_shock_angle(self, target, M1, ub)
             
-            f = self.flow;
+            state = self.flightstate;
             
-            if nargin < 3 || isempty(M1), M1 = f.Minf; end
+            if nargin < 3 || isempty(M1), M1 = state.Minf; end
             if nargin < 4 || isempty(ub)
                 
-                con = M1 == f.Minf;
-                ub(con) = f.max_beta;
+                con = M1 == state.Minf;
+                ub(con) = state.max_beta;
                 
                 if ~all(con)
                     
-                    [~, ub(~con)] = halfspace(M1(~con), self.max_theta_beta_mach(:,[1 3]));
+                    [~, ub(~con)] = halfspace(M1(~con), state.max_theta_beta_mach(:,[1 3]));
                 end
             end
             
-            g = f.gamma;
+            g = state.gamma;
             
             % Has to be made here due to M1 dependency
             oblque_shock_eqn = @(B) 2*cot(B) .* ((M1.^2) .* (sin(B).^2) - 1)./((M1.^2) .* (g + cos(2*B)) + 2);
             [beta, ~, ~] = bisection(oblque_shock_eqn, 0, ub, target, 1e-3);
         end
         function self = base(self, con)
-
-            f = self.flow;
-%             self.Medge(con) = f.Minf;
-%             self.Tedge(con) = f.Tinf;
-%             self.Pedge(con) = f.Pinf;
-%             self.rho(con) = f.rinf;
+            
+            state = self.flightstate;
+            %             self.Medge(con) = state.Minf;
+            %             self.Tedge(con) = state.Tinf;
+            %             self.Pedge(con) = state.Pinf;
+            %             self.rho(con) = state.rinf;
             
             self.Medge(con) = 0;
             self.Tedge(con) = 0;
             self.Pedge(con) = 0;
             self.rho(con) = 0;
-            self.Cp(con) = self.get_base_pressure(f.Minf, f.gamma);
+            self.Cp(con) = self.get_base_pressure(state.Minf, state.gamma);
         end
         function [self, tang, surf] = surface_velocity(self, unorm, normalise)
             
-            tang = crossmat(unorm, self.flow.Uvec);
+            tang = crossmat(unorm, self.flightstate.Uvec);
             surf = crossmat(tang, unorm);
             
             self.Vedge = surf;
@@ -765,7 +651,7 @@ classdef Aerodynamics
         function [T2_T1, P2_P1, r2_r1] = isentropic(self, M1, M2)
             % Isentropic flow relations
             %% TODO: Move to flightstate?
-            g = self.flow.gamma;
+            g = self.flightstate.gamma;
             
             T2_T1 = (1 + ((g - 1)/2) * (M1.^2)) ...
                 ./ (1 + ((g - 1)/2) * (M2.^2));
@@ -773,10 +659,16 @@ classdef Aerodynamics
             P2_P1 = T2_T1.^(g/(g - 1));
             r2_r1 = T2_T1.^(1/(g - 1));
         end
+        function centre_of_pressure = get_centre_of_pressure(self, centre)
+            
+            xyz_Cp = reshape(centre .* self.Cp, [], 3, 1);
+            sum_Cp = sum(self.Cp(:));
+            
+            centre_of_pressure = xyz_Cp/sum_Cp;
+        end
     end
     
     methods (Static)
-        
         function [fname, res, i] = get_method(name, self)
             
             fields = fieldnames(self);
