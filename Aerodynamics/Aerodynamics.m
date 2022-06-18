@@ -4,7 +4,9 @@ classdef Aerodynamics
         
         flightstate
         viscous
+        stability
         object
+        Aref = 1
         
         shield = false
         del
@@ -33,7 +35,7 @@ classdef Aerodynamics
     end
     
     methods
-        function self = InviscidAero(state, viscous)
+        function self = Aerodynamics(state, viscous, stability, Aref)
             
             if nargin > 0
                 
@@ -46,10 +48,19 @@ classdef Aerodynamics
                     
                     self.viscous = viscous;
                 end
+                if nargin >= 3 && ~isempty(stability)
+                    
+                    self.stability = stability;
+                end
+                if nargin >= 4 && ~isempty(Aref)
+                    
+                    self.Aref = Aref;
+                end
             end
         end
         function [force_coeffs, forces, out] = trim(...
-                self, Aref, weight, varargin)
+                self, weight, varargin)
+            %% TODO: When integrating Structures module, this will have to be abstracted from Aerodynamics, so that it can be used for Aerostructual analysis also
             %TRIM attempts to find the trim angle of attack for an input
             %vehicle
             %   This is a simple routine that assumes no control surfaces,
@@ -73,7 +84,7 @@ classdef Aerodynamics
             initial_step = deg2rad(5);
             % Set initial alpha to reasonable trim angle
             self.flightstate.alpha = alpha;
-            [force_coeffs, forces] = self.run(Aref, varargin{:});
+            [force_coeffs, forces] = self.run(varargin{:});
             
             if isinf(weight)
                 
@@ -139,12 +150,107 @@ classdef Aerodynamics
                 
                 % Update alpha and re-run
                 self.flightstate.alpha = alpha;
-                [force_coeffs, forces] = self.run(Aref, varargin{:});
+                [force_coeffs, forces] = self.run(varargin{:});
                 iter = iter + 1;
             end
         end
-        
-        function [force_coeffs, forces, all_data] = run(self, Aref, varargin)
+        function [dCm_dalpha, dCl_dbeta] = get_stability(...
+                self, Cm, Cl, varargin)
+            %GET_STABILITY calculates longitudinal and lateral stability
+            %derivatives
+            %   The current values of alpha and beta will be perturbed to
+            %   produce the stability derivatives, which is useful when
+            %   a trim routine has been carried out, providing stability
+            %   derivatives for the trimmed state.
+            %
+            %   Inputs:
+            %   Cm - the pitching moment coefficient for the current
+            %       unperturbed flightstate
+            %   Cl - the lift coeffient for the current unperturbed
+            %       flightstate
+            %   varargin - the input objects to be analysed
+            %
+            %   If only Cm is entered, only the longitudinal coefficient
+            %   will be computed.
+            %   If only Cl is entered, only the lateral coefficient will be
+            %   computed.
+            %   If neither Cm or Cl is entered, it is assumed that the
+            %   current flightstate has not yet been assessed, and
+            %   therefore will be assessed before calcuating stability
+            %   derivatives.
+            
+            if isempty(Cm) && isempty(Cl)
+                
+                fc = self.run(varargin{:});
+                Cm = fc.Cm;
+                Cl = fc.Cl;
+            end
+            
+            dCm_dalpha = [];
+            dCl_dbeta = [];
+            
+            if ~isempty(Cm)
+                %% Longitudinal stability
+                % Setting up angle delta for angle of attack and sideslip
+                angle_perturabtion = deg2rad(0.5);
+                
+                original_alpha = self.flightstate.alpha;
+                perturbed_alpha = original_alpha + angle_perturabtion;
+                self.flightstate.alpha = perturbed_alpha;
+                
+                pert_force_coeffs = self.run(varargin{:});
+                
+                dCm_dalpha = (pert_force_coeffs.Cm - Cm)/...
+                    (perturbed_alpha - original_alpha);
+                
+                % Resetting alpha
+                self.flightstate.alpha = original_alpha;
+            end
+            
+            if ~isempty(Cl)
+                %% Lateral stability
+                original_beta = self.flightstate.beta;
+
+                if original_beta == 0
+                    % Multiplying by two to get full vehicle lift coefficient
+                    Cl = Cl * 2;
+                end
+
+                perturbed_beta = original_beta + angle_perturabtion;
+                self.flightstate.beta = perturbed_beta;
+                
+                %% TODO: Move this to subfunction which is called whenever beta ~= 0
+                for i = numel(varargin):-1:1
+
+                    part = varargin{i};
+
+                    if ~isempty(part)
+
+                        mirror = part;
+
+                        mirror.x = flip(mirror.x, 2);
+                        mirror.y = flip(-mirror.y, 2);
+                        mirror.z = flip(mirror.z, 2);
+                        mirror = mirror.get_data;
+
+                        mirrored_part{i} = mirror;
+                    end
+                end
+
+                fc1 = self.run(varargin{:});
+                fc2 = self.run(mirrored_part{:});
+                
+                %%
+                perturbed_Cl = fc1.Cl + fc2.Cl;
+
+                % Resetting beta
+                self.flightstate.beta = original_beta;
+
+                dCl_dbeta = (perturbed_Cl - Cl)/...
+                    (perturbed_beta - original_beta);
+            end
+        end
+        function [outputs] = run(self, varargin)
             %RUN wraps the main function to allow multiple objects to be
             %analysed and aggregated, producing overall vehicle
             %characteristics
@@ -153,31 +259,21 @@ classdef Aerodynamics
                 part = varargin{i};
                 part = part.get_data();
                 
-                aero_part = self.main(part);
-                
-                fco(i) = ForceCoeffs(...
-                    aero_part.Cp, ...
-                    aero_part.cf, ...
-                    part.data.area, ...
-                    part.data.unit_norm, ...
-                    self.flightstate.alpha, ...
-                    Aref);
-                
-                f(i) = Forces(fco(i), self.flightstate.q, Aref);
-                
-                if nargout >= 3
-                    
-                    all_data.aero(i) = aero_part;
-                    all_data.force_co(i) = fco(i);
-                    all_data.forces(i) = f(i);
-                end
+                [~, part_outputs(i)] = self.main(part);
             end
             
-            force_coeffs = fco.sum();
-            forces = f.sum();
+            if numel(varargin) == 1
+                
+                outputs = part_outputs;
+                
+                combined_fco = [outputs.fco];
+                combined_forces = [outputs.forces];
+                force_coeffs = combined_fco.sum();
+                forces = combined_forces.sum();
+            end
         end
         
-        function self = main(self, part)
+        function [self, outputs] = main(self, part)
             
             self.object = part;
             
@@ -285,6 +381,34 @@ classdef Aerodynamics
                 % Copying friction coefficient back to main object
                 self.cf = self.viscous.cf;
             end
+            
+            outputs = self.get_outputs();
+        end
+        function [fco, forces] = get_force_data(self)
+            
+            fco = ForceCoeffs(...
+                self.Cp, ...
+                self.cf, ...
+                self.object.data.area, ...
+                self.object.data.unit_norm, ...
+                self.flightstate.alpha, ...
+                self.Aref);
+            
+            forces = Forces(fco, self.flightstate.q, self.Aref);
+        end
+        function outputs = get_outputs(self)
+            %GET_OUTPUTS return a structure of chosen calculated parameters
+            %   This avoids outputting the full object with lookup tables
+            %   etc
+            
+            [fco, forces] = self.get_force_data();
+            
+            outputs = struct(...
+                "force_coeffs", fco,...
+                "forces", forces,...
+                "Cp", self.Cp,...
+                "cf", self.cf,...
+                "viscous", self.viscous.get_outputs());
         end
         function self = method_switcher(self, methods, id)
             
