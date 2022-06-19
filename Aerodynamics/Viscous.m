@@ -4,7 +4,6 @@ classdef Viscous
         
         method = "test"
         flightstate
-        object
         Rn              % Nose radius
         
         Tedge
@@ -37,16 +36,16 @@ classdef Viscous
                 end
             end
         end
-        function self = run(self)
+        function self = run(self, part)
             
             if strcmpi(self.method, "test")
                 
-                self = self.test();
+                self = self.test(part);
             else
                 error("No viscous method %s implemented")
             end
         end
-        function self = test(self)
+        function self = test(self, part)
             
             state = self.flightstate;
             dim = size(self.Tedge);
@@ -76,14 +75,14 @@ classdef Viscous
                 self.rho(set) = min(self.rho(~set));
             end
             
-            self.Re_x = self.get_Re_x();
+            self.Re_x = self.get_Re_x(part);
             
             % [self.cf, q, self.Re] = obj.eckert(Tw);
             
             for i = 1:max_it
                 %% TODO: Comapred to DiGiorgio2019, commenting out gives closer result, cold wall assumption?
                 %% TODO: Also producing imaginary numbers
-                [self.cf, q, self.Re] = self.eckert(Tw);
+                [self.cf, q, self.Re] = self.eckert(Tw, part.conical);
                 
                 prev = Tw;
                 % qw = self.simple_heating(Tw, Rn);
@@ -101,7 +100,7 @@ classdef Viscous
                 Tw = real(((q - 0)./(state.eps * state.STF) + state.Tinf.^4).^0.25);
                 
                 %% TODO: CLEAN
-                Tw(self.object.data.area == 0) = 0;
+                Tw(part.data.area == 0) = 0;
                 %con = Tw > self.get_Taw | ~isfinite(Tw) | imag(Tw) > 0;
                 %Tw(con) = self.get_Taw(con);
                 
@@ -122,7 +121,7 @@ classdef Viscous
             self.qwall = q;
             self.max_Twall = max(Tw(:));
         end
-        function [cf_star, q, Re_star_x] = eckert(self, Tw)
+        function [cf_star, q, Re_star_x] = eckert(self, Tw, conical)
             
             state = self.flightstate;
             Te = self.Tedge;
@@ -177,7 +176,7 @@ classdef Viscous
             cf_star(turb) = 0.02296./((Re_star_x(turb)).^0.139);
             
             % Mangler factor for conical bodies
-            if self.object.conical
+            if conical
                 
                 % White2006
                 ml = 1;
@@ -200,7 +199,7 @@ classdef Viscous
             cf_star(con) = 0;
             q(con) = 0;
         end
-        function qw = simple_heating(self, Tw, Rn)
+        function qw = simple_heating(self, Tw, Rn, part)
             %% TODO: Self rewrites (aero, object)
             if nargin < 1 || isempty(Tw)
                 % Tw = self.Tinf; 
@@ -245,13 +244,13 @@ classdef Viscous
                 % flow, otherwise flap plate relation holds
                 con = Rn > 0 & self.Tedge(1,:) > self.Tinf;
                 
-                if self.object.conical
+                if part.conical
                     
                     qw(1,con) = q0(con);
                 else
                     %% TODO: Move to Wingsection
                     % Hacky way to get sweep for upper/lower surfaces
-                    le_sweep = self.object.get_lead_sweep();
+                    le_sweep = part.get_lead_sweep();
                     le_sweep = le_sweep([1:end end end:-1:1]);
                     
                     % From: Aerothermodynamics of Transatmospheric Vehicles
@@ -319,7 +318,7 @@ classdef Viscous
             a = exp(6.421 * exp(1.209e-4 * self.Medge.^2.641));
         end
         
-        function qw = medium_heating(self, Tw, Rn, laminar)
+        function qw = medium_heating(self, Tw, Rn, laminar, part)
             %% TODO: Self rewrites (aero, object)
             if nargin < 1 || isempty(Tw), Tw = self.Tinf; end
             if nargin < 3 || isempty(laminar), laminar = true; end
@@ -328,12 +327,12 @@ classdef Viscous
             
             if ~isempty(Rn)
                 
-                if self.object.conical
+                if part.conical
                     
                     qw = stagnation(Rn);
                 else
                     % Hacky way to get sweep for upper/lower surfaces
-                    le_sweep = self.object.get_lead_sweep();
+                    le_sweep = part.get_lead_sweep();
                     le_sweep = le_sweep([1:end end end:-1:1]);
                     
                     q0 = stagnation(Rn);
@@ -369,29 +368,6 @@ classdef Viscous
             % Calorifically perfect gas: Anderson2006 p276
             T = h / self.cp;
         end
-        function Re_x = get_Re_x(self)
-            %% TODO: Move to Geometry
-            if self.object.conical
-                
-                le = mean(self.object.points(1,:,:));
-                centre = self.object.centre - le;
-                centre = [zeros(1, size(centre, 2), 3); centre];
-            else
-                %% TODO: Correct? Make consistent                
-                try
-                    le = (self.object.points(1,1:end-1,:) + ...
-                        self.object.points(1,2:end,:))/2;
-                    centre = self.object.centre - le;
-                    centre = [zeros(1, size(centre, 2), 3); centre];
-                catch
-                    le = zeros(1, 1, 2);
-                    centre = self.object.data.centre - le;
-                    centre = [zeros(1, size(centre, 2), 2); centre];
-                end
-            end
-
-            Re_x = cumsum(magmat(diff(centre)));
-        end
         function a = get_Taw(self)
             
             state = self.flightstate;
@@ -406,40 +382,28 @@ classdef Viscous
     
     methods (Static)
         
-        function obj = from_aerodynamics(aero)
-            %% Create viscous object from existing aerodynamics object
-            % Apply fields from existing Aerodynamics obj to Viscous obj
-            
-            obj = Viscous();
-            aero_fn = fieldnames(aero);
-            visc_fn = fieldnames(obj);
-            
-            for i = 1:numel(visc_fn)
+        function Re_x = get_Re_x(part)
+            %% TODO: Move to Geometry or Aerodynamics pre-processing?
+            if part.conical
                 
-                field = visc_fn{i};
-                
-                if any(strcmp(field, aero_fn))
-                    
-                    obj.(field) = aero.(field);
+                le = mean(part.points(1,:,:));
+                centre = part.centre - le;
+                centre = [zeros(1, size(centre, 2), 3); centre];
+            else
+                %% TODO: Correct? Make consistent                
+                try
+                    le = (part.points(1,1:end-1,:) + ...
+                        part.points(1,2:end,:))/2;
+                    centre = part.centre - le;
+                    centre = [zeros(1, size(centre, 2), 3); centre];
+                catch
+                    le = zeros(1, 1, 2);
+                    centre = part.data.centre - le;
+                    centre = [zeros(1, size(centre, 2), 2); centre];
                 end
             end
-            
-            %% TODO: Redefine aero/flightstate/viscous to avoid interdep
-            flow = aero.flow;
-            flow_fn = fieldnames(flow);
-            
-            for i = 1:numel(visc_fn)
-                
-                field = visc_fn{i};
-                
-                if any(strcmp(field, flow_fn))
-                    
-                    try
-                    obj.(field) = flow.(field);
-                    catch
-                    end
-                end
-            end
+
+            Re_x = cumsum(magmat(diff(centre)));
         end
     end
 end
