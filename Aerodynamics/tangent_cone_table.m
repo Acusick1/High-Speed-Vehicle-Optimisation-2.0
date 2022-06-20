@@ -16,17 +16,10 @@ theta = (0.001:0.001:max_theta)';
 tau = asin(sin(theta) .* (((gamma + 1)/2) + ...
            (1./((M1 * sin(theta)).^2))).^0.5);
 
-i = numel(tau);
-M2 = zeros(size(tau));
-
-%% TODO: Why is this going backwards? M2 == M1 would only break loop if tau was very small, and would not calculate remaining larger angles?
 % Exact Taylor-Maccoll solution?
-while i > 0
+for i = numel(tau):-1:1
     
     [~, M2(i), ~] = solvecone(tau(i), M1, gamma);
-    if M2(i) == M1, break; end
-    i = i - 1;
 end
 
 table = [tau, M2];
-table(1:i, :) = [];

@@ -72,13 +72,13 @@ classdef Flightstate
                 args = varargin(~order_id);
                 
                 % Get length of each argument
-                arg_length = cellfun(@numel, args);
+                arg_lengths = cellfun(@numel, args);
                 
-                if any(arg_length > 1)
+                if any(arg_lengths > 1)
                     % If more than one argument set present, move to
                     % wrapper function
                     self = Flightstate.define_many(...
-                        args, arg_length, order_arg{:});
+                        args, arg_lengths, order_arg{:});
                 else
                     % Define object with singular inputs
                     self.alpha      = args{1};
@@ -87,22 +87,39 @@ classdef Flightstate
                     
                     if numel(args) >= 4, self.beta = args{4}; end
                     
+                    [~, self.max_theta_beta_mach] = theta_beta_mach_curves();
                     self = self.max_shock_angles();
                     self = self.get_atmospheric_values();
                 end
             end
         end
+        function self = set.Minf(self, value)
+            % Set Minf and run dependent functions
+            self.Minf = value;
+            self = self.max_shock_angles();
+            self = self.get_atmospheric_values();
+        end
+        function self = set.altitude(self, value)
+            % Set altitude and run dependent functions
+            self.altitude = value;
+            self = self.get_atmospheric_values();
+        end 
         function self = get_atmospheric_values(self)
             %GET_ATMOSPHERIC_VALUES derives necessary atmospheric
             %properties used in aerodynamic calculations
+            
+            % Ensure this function does not run unless both mach and 
+            % altitude are set
+            if isempty(self.Minf) || isempty(self.altitude), return; end
+            
             output = tewari_atmosphere(self.altitude, 0, 0);
              
-            self.Tinf = output(1); % Freestream temperature
-            self.rinf = output(2); % Freestream density
-            self.Pinf = output(7); % Freestream pressure
-            self.a = output(5); % Speed of sound
-            self.mu = output(8); % Dynamic viscosity
-            self.kt = output(10); % Thermal conductivity
+            self.Tinf = output(1);  % Freestream temperature
+            self.rinf = output(2);  % Freestream density
+            self.Pinf = output(7);  % Freestream pressure
+            self.a = output(5);     % Speed of sound
+            self.mu = output(8);    % Dynamic viscosity
+            self.kt = output(10);   % Thermal conductivity
             
             g = self.gamma;
             M = self.Minf;
@@ -111,7 +128,6 @@ classdef Flightstate
             Pinf_P0 = (2./((g+1)*(M.^2))).^(g/(g-1)) .* ...
                 (((2*g*(M.^2))-(g-1))/(g+1)).^(1/(g-1));
             
-            %% TODO: reasonable results for all Mach numbers?
             % Matching point method for Newtonian + Prandtl-Meyer method
             [self.delta_q, self.Mach_q] = matching_point(g, Pinf_P0);
             
@@ -124,9 +140,17 @@ classdef Flightstate
             self.T0 = self.Tinf * (1 + (g - 1)/2 * (M^2));
             
         end
+        function self = max_shock_angles(self)
+            %MAX_SHOCK_ANGLES Defines maximum deflection and shockwave 
+            %angles for input Mach number from theta beta Mach curves
+            [~, angles] = halfspace(self.Minf, self.max_theta_beta_mach);
+            
+            self.max_del = angles(1);
+            self.max_beta = angles(2);
+        end
         function Uvec = get.Uvec(self)
-            % Putting this in a get function as if alpha changes, the
-            % velocity vector must update
+            % Putting this in a get function as dependent on multiple
+            % properties, will have to be updated if any are updated
             if ~isempty(self.Uinf)
                 
                 Uvec = self.Uinf * ...
@@ -134,16 +158,6 @@ classdef Flightstate
                      sin(self.beta), ...
                      sin(self.alpha)];
             end
-        end
-        function self = max_shock_angles(self)
-            %MAX_SHOCK_ANGLES Defines maximum deflection and shockwave 
-            %angles for input Mach number from theta beta Mach curves
-            [~, table] = theta_beta_mach_curves();
-            [~, angles] = halfspace(self.Minf, table);
-            
-            self.max_theta_beta_mach = table;
-            self.max_del = angles(1);
-            self.max_beta = angles(2);
         end
     end
     

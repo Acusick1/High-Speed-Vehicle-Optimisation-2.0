@@ -42,7 +42,10 @@ classdef Aerodynamics
             if nargin > 0
                 
                 gamma = state.gamma;
-                self.cone_table = tangent_cone_table(state.Minf, gamma);
+                %% TODO: Expensive function call > how to deal with uncertain Minf
+                self.cone_table = tangent_cone_table(...
+                    state.Minf, gamma, state.max_del);
+                
                 self.vmax = pi/2 * (((gamma + 1)/(gamma - 1))^0.5 - 1);
                 self.flightstate = state;
                 
@@ -120,7 +123,7 @@ classdef Aerodynamics
                 if iter == 0
                     
                     alpha = alpha - (sign(LW_diff) * initial_step);
-                else                
+                else
                     % Exit criteria:
                     %   Trim convergence (lift ~= weight)
                     %   Angle of attack is not longer changing due to trim 

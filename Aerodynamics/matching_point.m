@@ -1,5 +1,6 @@
 function [match_del, match_mach] = matching_point(gamma, Pinf_P0)
 %% TODO: match_del not implemented anywhere, should be used as a switch with Aerodynamics?
+%% TODO: reasonable results for all Mach numbers?
 %MATCHING_POINT calculates point to switch from Newtonian to Prandtl-Meyer
 %   Find point (inclination angle and Mach number) at which Prandtl-Meyer 
 %   and Newtonian calculated pressures are equal
